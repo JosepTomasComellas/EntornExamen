@@ -1,0 +1,527 @@
+@page "/professor/examen"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject UserStateService UserState
+@inject NavigationManager Nav
+@inject ExamenNotificationService ExamenNotif
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Plafó d'Examen</PageTitle>
+
+@if (!UserState.IsProfessor) { Nav.NavigateTo("/"); return; }
+
+<!-- Barra de control -->
+<MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4">
+    <MudText Typo="Typo.h5"><strong>Plafó d'Examen</strong></MudText>
+    <MudSpacer />
+
+    @if (_sessio is not null)
+    {
+        <MudChip T="string" Color="@(_sessio.Activa ? Color.Success : Color.Default)"
+                 Size="Size.Small">
+            @(_sessio.Activa ? "ACTIVA" : "TANCADA")
+        </MudChip>
+        <MudText Typo="Typo.body2">
+            @_connectats / @_sessio.TotalAlumnes connectats
+        </MudText>
+        <MudProgressLinear
+            Value="@(_sessio.TotalAlumnes > 0 ? _connectats * 100.0 / _sessio.TotalAlumnes : 0)"
+            Color="Color.Success" Rounded="true" Size="Size.Small"
+            Style="min-width:120px;max-width:200px" />
+    }
+
+    <!-- Botons acció -->
+    @if (_sessio is null || !_sessio.Activa)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.PlayArrow"
+                   OnClick="() => _mostrarDialegNovaSessio = true">
+            INICIAR SESSIÓ
+        </MudButton>
+    }
+    else
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Stop"
+                   OnClick="TancarSessio">
+            TANCAR SESSIÓ
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Campaign"
+                   OnClick="() => _mostrarDialegMissatge = true">
+            ENVIAR MISSATGE
+        </MudButton>
+    }
+
+    @if (_sessio is not null)
+    {
+        <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Download"
+                   OnClick="ExportarCsv">
+            EXPORTAR CSV
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Fullscreen"
+                   OnClick="EntrarModePresentacio">
+            PRESENTACIÓ
+        </MudButton>
+    }
+</MudStack>
+
+<!-- Selector de sessió (admin) -->
+@if (UserState.IsAdmin && _sessions.Count > 1)
+{
+    <MudSelect T="int?" Label="Sessió activa" Value="_sessioId"
+               ValueChanged="SeleccionarSessio" Variant="Variant.Outlined"
+               Class="mb-4" Dense="true" Style="max-width:400px">
+        @foreach (var s in _sessions)
+        {
+            <MudSelectItem Value="@((int?)s.Id)">
+                @s.ClassName — @(s.Titol ?? "Sense títol") (@(s.Activa ? "activa" : "tancada"))
+            </MudSelectItem>
+        }
+    </MudSelect>
+}
+
+<!-- Sense sessió -->
+@if (_sessio is null && !_carregant)
+{
+    <MudAlert Severity="Severity.Info">
+        No hi ha cap sessió d'examen. Utilitza el botó <strong>INICIAR SESSIÓ</strong> per crear-ne una.
+    </MudAlert>
+}
+
+<!-- Graella d'alumnes -->
+@if (_alumnes.Count > 0)
+{
+    <MudGrid Spacing="2" Class="mt-2" id="graella-examen">
+        @foreach (var a in _alumnesOrdenats)
+        {
+            var color = EstatColor(a.Estat);
+            var textColor = a.Estat == EstatConnexioDto.Connectat ? "color:#15803d" :
+                            a.Estat == EstatConnexioDto.SenseCheckin ? "color:#b45309" :
+                            a.Estat == EstatConnexioDto.Desconnectat ? "color:#dc2626" :
+                            "color:#6b7280";
+
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudCard Elevation="2" Style="@($"border-left:4px solid {color};cursor:pointer")"
+                         @onclick="() => SeleccionarAlumne(a)">
+                    <MudCardContent Class="pa-3">
+                        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                            <!-- Foto o avatar -->
+                            @if (a.FotoUrl is not null)
+                            {
+                                <MudAvatar Style="width:48px;height:48px">
+                                    <MudImage Src="@a.FotoUrl"
+                                              Style="width:48px;height:48px;object-fit:cover" />
+                                </MudAvatar>
+                            }
+                            else
+                            {
+                                <MudAvatar Style="@($"width:48px;height:48px;background:{color}20;color:{color}")">
+                                    @((a.Nom?[..1] ?? "?") + (a.Cognoms?[..1] ?? ""))
+                                </MudAvatar>
+                            }
+                            <MudStack Spacing="0" Style="min-width:0;flex:1">
+                                <MudText Typo="Typo.body2" Style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                                    @a.Cognoms, @a.Nom
+                                </MudText>
+                                <MudText Typo="Typo.caption" Style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                                    @a.Email
+                                </MudText>
+                            </MudStack>
+                        </MudStack>
+
+                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="mt-2">
+                            <div style="@($"width:10px;height:10px;border-radius:50%;background:{color}")"></div>
+                            <MudText Typo="Typo.caption" Style="@($"{textColor};font-weight:600")">
+                                @EstatText(a.Estat)
+                            </MudText>
+                            @if (a.IpAssignada is not null)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    · @a.IpAssignada
+                                </MudText>
+                            }
+                            @if (a.DnsRecents.Any(d => d.EsExterna))
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Warning"
+                                         Color="Color.Warning" Size="Size.Small"
+                                         title="DNS externes detectades"
+                                         Class="ml-auto"
+                                         Style="animation:pulse-warning 1s infinite" />
+                            }
+                        </MudStack>
+
+                        @if (a.UltimCheckinAt.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Check-in: @a.UltimCheckinAt.Value.ToLocalTime().ToString("HH:mm:ss")
+                            </MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+<!-- Panell d'alertes -->
+@if (_alertes.Count > 0)
+{
+    <MudPaper Elevation="2" Class="pa-3 mt-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+            <MudText Typo="Typo.subtitle2"><strong>Alertes</strong></MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Text" Size="Size.Small"
+                       OnClick="() => _alertes.Clear()">
+                Netejar
+            </MudButton>
+        </MudStack>
+        <MudList T="string" Dense="true">
+            @foreach (var alerta in _alertes.TakeLast(20).Reverse())
+            {
+                <MudListItem Icon="@alerta.Icona" IconColor="alerta.Color">
+                    <MudText Typo="Typo.caption">
+                        <strong>@alerta.Hora.ToLocalTime().ToString("HH:mm:ss")</strong>
+                        — @alerta.Text
+                    </MudText>
+                </MudListItem>
+            }
+        </MudList>
+    </MudPaper>
+}
+
+<!-- Drawer detall alumne -->
+<MudDrawer @bind-Open="_mostraDetall" Anchor="Anchor.Right" Elevation="4" Width="380px">
+    @if (_alumneSeleccionat is not null)
+    {
+        <MudDrawerHeader>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudText Typo="Typo.h6">
+                    @_alumneSeleccionat.Nom @_alumneSeleccionat.Cognoms
+                </MudText>
+                <MudSpacer />
+                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                               OnClick="() => _mostraDetall = false" />
+            </MudStack>
+        </MudDrawerHeader>
+        <MudStack Class="pa-4" Spacing="3">
+            <MudText Typo="Typo.body2">
+                <strong>Email:</strong> @_alumneSeleccionat.Email
+            </MudText>
+            <MudText Typo="Typo.body2">
+                <strong>MAC:</strong> @_alumneSeleccionat.MacAddress
+            </MudText>
+            <MudText Typo="Typo.body2">
+                <strong>IP:</strong> @(_alumneSeleccionat.IpAssignada ?? "—")
+            </MudText>
+            <MudText Typo="Typo.body2">
+                <strong>Estat:</strong> @EstatText(_alumneSeleccionat.Estat)
+            </MudText>
+            <MudDivider />
+            <MudText Typo="Typo.subtitle2">Peticions DNS</MudText>
+            @if (_alumneSeleccionat.DnsRecents.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Cap petició registrada</MudText>
+            }
+            else
+            {
+                foreach (var dns in _alumneSeleccionat.DnsRecents.OrderByDescending(d => d.Timestamp))
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        @if (dns.EsExterna)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Warning"
+                                     Color="Color.Warning" Size="Size.Small" />
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Check"
+                                     Color="Color.Success" Size="Size.Small" />
+                        }
+                        <MudText Typo="Typo.caption">
+                            @dns.Timestamp.ToLocalTime().ToString("HH:mm:ss") — @dns.Domini
+                        </MudText>
+                    </MudStack>
+                }
+            }
+        </MudStack>
+    }
+</MudDrawer>
+
+<!-- Diàleg nova sessió -->
+<MudDialog @bind-Visible="_mostrarDialegNovaSessio">
+    <TitleContent><MudText Typo="Typo.h6">Iniciar sessió d'examen</MudText></TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudSelect T="int" @bind-Value="_novaClasseId" Label="Classe"
+                       Variant="Variant.Outlined">
+                @foreach (var c in _classes)
+                {
+                    <MudSelectItem Value="@c.Id">@c.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_novaTitol" Label="Títol (opcional)"
+                          Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_novaDescripcio" Label="Instruccions per als alumnes"
+                          Variant="Variant.Outlined" Lines="3" />
+        </MudStack>
+        @if (_errorNovaSessio is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-2">@_errorNovaSessio</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _mostrarDialegNovaSessio = false">Cancel·lar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   OnClick="IniciarSessio" Disabled="_carregant">
+            INICIAR
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Diàleg missatge professor -->
+<MudDialog @bind-Visible="_mostrarDialegMissatge">
+    <TitleContent><MudText Typo="Typo.h6">Enviar missatge als alumnes</MudText></TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_textMissatge" Label="Missatge"
+                      Variant="Variant.Outlined" Lines="3" MaxLength="500"
+                      Counter="500" />
+        @if (_sessio?.MissatgeActiu is not null)
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-2" Dense="true">
+                Missatge actual: <em>@_sessio.MissatgeActiu</em>
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_sessio?.MissatgeActiu is not null)
+        {
+            <MudButton Color="Color.Error" OnClick="EsborrarMissatge">
+                ESBORRAR MISSATGE
+            </MudButton>
+        }
+        <MudButton OnClick="() => _mostrarDialegMissatge = false">Cancel·lar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Warning"
+                   OnClick="EnviarMissatge" Disabled="string.IsNullOrWhiteSpace(_textMissatge)">
+            ENVIAR
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<SessioExamenDto>   _sessions    = [];
+    private List<ClassDto>          _classes     = [];
+    private List<ExamenAlumneDto>   _alumnes     = [];
+    private List<AlertaExamen>      _alertes     = [];
+    private SessioExamenDto?        _sessio;
+    private ExamenAlumneDto?        _alumneSeleccionat;
+
+    private int?    _sessioId;
+    private bool    _carregant;
+    private bool    _mostraDetall;
+
+    private bool    _mostrarDialegNovaSessio;
+    private bool    _mostrarDialegMissatge;
+    private int     _novaClasseId;
+    private string  _novaTitol    = "";
+    private string  _novaDescripcio = "";
+    private string? _errorNovaSessio;
+    private string  _textMissatge = "";
+
+    private Func<string, object, Task>? _sessioHandler;
+
+    private int _connectats => _alumnes.Count(a =>
+        a.Estat is EstatConnexioDto.Connectat or EstatConnexioDto.SenseCheckin);
+
+    private IEnumerable<ExamenAlumneDto> _alumnesOrdenats => _alumnes
+        .OrderBy(a => a.Estat switch
+        {
+            EstatConnexioDto.Connectat     => 0,
+            EstatConnexioDto.SenseCheckin  => 1,
+            EstatConnexioDto.Desconnectat  => 2,
+            _                              => 3
+        })
+        .ThenBy(a => a.NumLlista ?? int.MaxValue);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserState.IsProfessor) return;
+        _carregant = true;
+        _classes   = await Api.GetClassesAsync() ?? [];
+        _sessions  = await Api.GetExamenSessionsAsync() ?? [];
+
+        // Selecciona la primera sessió activa per defecte
+        var activa = _sessions.FirstOrDefault(s => s.Activa);
+        if (activa is not null)
+            await SeleccionarSessio(activa.Id);
+
+        _carregant = false;
+    }
+
+    private async Task SeleccionarSessio(int? id)
+    {
+        if (id is null) return;
+
+        // Dessubscriu sessió anterior
+        if (_sessioId.HasValue && _sessioHandler is not null)
+            ExamenNotif.DesubscriuSessio(_sessioId.Value, _sessioHandler);
+
+        _sessioId = id;
+        await CarregarDashboard();
+
+        // Subscriu notificacions
+        _sessioHandler = async (eventNom, data) =>
+        {
+            await ProcessarEventAsync(eventNom, data);
+        };
+        ExamenNotif.SubscriuSessio(_sessioId.Value, _sessioHandler);
+    }
+
+    private async Task CarregarDashboard()
+    {
+        if (_sessioId is null) return;
+        var dashboard = await Api.GetExamenDashboardAsync(_sessioId.Value);
+        if (dashboard is null) return;
+        _sessio  = dashboard.Sessio;
+        _alumnes = dashboard.Alumnes;
+    }
+
+    private async Task ProcessarEventAsync(string eventNom, object data)
+    {
+        switch (eventNom)
+        {
+            case "AlumneConnectat" when data is ExamenEventAlumne evt:
+                ActualitzarAlumne(evt.Mac, a => a with { Estat = EstatConnexioDto.Connectat, IpAssignada = evt.Ip });
+                AfegirAlerta($"Connectat: {evt.Nom} {evt.Cognoms}", Icons.Material.Filled.Link, Color.Success);
+                break;
+            case "AlumneDesconnectat" when data is ExamenEventAlumne evt:
+                ActualitzarAlumne(evt.Mac, a => a with { Estat = EstatConnexioDto.Desconnectat });
+                AfegirAlerta($"Desconnectat: {evt.Nom} {evt.Cognoms}", Icons.Material.Filled.LinkOff, Color.Error);
+                await JS.InvokeVoidAsync("examenSoDesconnexio");
+                break;
+            case "NouCheckin" when data is ExamenEventAlumne evt:
+                ActualitzarAlumne(evt.Mac, a => a with
+                {
+                    Estat = EstatConnexioDto.Connectat,
+                    UltimCheckinAt = evt.Timestamp
+                });
+                break;
+            case "NovaPeticioExterna" when data is ExamenEventDns evt:
+                AfegirAlerta($"DNS externa: {evt.Nom} → {evt.Domini}",
+                    Icons.Material.Filled.Warning, Color.Warning);
+                break;
+            case "MacDesconeguda" when data is ExamenEventAlumne evt:
+                AfegirAlerta($"MAC desconeguda: {evt.Mac} ({evt.Ip})",
+                    Icons.Material.Filled.DeviceUnknown, Color.Secondary);
+                break;
+            case "MissatgeActualitzat" when data is ExamenEventMissatge msg:
+                if (_sessio is not null) _sessio = _sessio with { MissatgeActiu = msg.Text };
+                break;
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ActualitzarAlumne(string mac, Func<ExamenAlumneDto, ExamenAlumneDto> update)
+    {
+        var idx = _alumnes.FindIndex(a => a.MacAddress == mac);
+        if (idx >= 0) _alumnes[idx] = update(_alumnes[idx]);
+    }
+
+    private void AfegirAlerta(string text, string icona, Color color)
+    {
+        _alertes.Add(new AlertaExamen(text, icona, color, DateTime.UtcNow));
+        if (_alertes.Count > 100) _alertes.RemoveRange(0, _alertes.Count - 100);
+    }
+
+    private async Task IniciarSessio()
+    {
+        _errorNovaSessio = null;
+        if (_novaClasseId == 0) { _errorNovaSessio = "Selecciona una classe."; return; }
+
+        _carregant = true;
+        var (sessio, error) = await Api.CreateExamenSessioAsync(
+            new CreateSessioRequest(_novaClasseId, _novaTitol, _novaDescripcio));
+        _carregant = false;
+
+        if (error is not null) { _errorNovaSessio = error; return; }
+
+        _mostrarDialegNovaSessio = false;
+        _sessions = await Api.GetExamenSessionsAsync() ?? [];
+        if (sessio is not null)
+            await SeleccionarSessio(sessio.Id);
+    }
+
+    private async Task TancarSessio()
+    {
+        if (_sessioId is null) return;
+        await Api.TancarExamenSessioAsync(_sessioId.Value);
+        await CarregarDashboard();
+        StateHasChanged();
+    }
+
+    private async Task EnviarMissatge()
+    {
+        if (_sessioId is null || string.IsNullOrWhiteSpace(_textMissatge)) return;
+        await Api.SetMissatgeExamenAsync(_sessioId.Value, _textMissatge);
+        _mostrarDialegMissatge = false;
+        _textMissatge          = "";
+    }
+
+    private async Task EsborrarMissatge()
+    {
+        if (_sessioId is null) return;
+        await Api.DeleteMissatgeExamenAsync(_sessioId.Value);
+        if (_sessio is not null) _sessio = _sessio with { MissatgeActiu = null };
+        _mostrarDialegMissatge = false;
+    }
+
+    private async Task ExportarCsv()
+    {
+        if (_sessioId is null) return;
+        var result = await Api.ExportarExamenCsvAsync(_sessioId.Value);
+        if (result is null) return;
+        var (bytes, fileName) = result.Value;
+        var b64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadFileFromBase64", b64, fileName, "text/csv");
+    }
+
+    private async Task EntrarModePresentacio()
+    {
+        await JS.InvokeVoidAsync("document.documentElement.requestFullscreen");
+        StateHasChanged();
+    }
+
+    private void SeleccionarAlumne(ExamenAlumneDto a)
+    {
+        _alumneSeleccionat = a;
+        _mostraDetall      = true;
+    }
+
+    private static string EstatColor(EstatConnexioDto estat) => estat switch
+    {
+        EstatConnexioDto.Connectat    => "#22c55e",
+        EstatConnexioDto.SenseCheckin => "#f59e0b",
+        EstatConnexioDto.Desconnectat => "#ef4444",
+        _                             => "#9ca3af"
+    };
+
+    private static string EstatText(EstatConnexioDto estat) => estat switch
+    {
+        EstatConnexioDto.Connectat    => "Connectat",
+        EstatConnexioDto.SenseCheckin => "Sense check-in",
+        EstatConnexioDto.Desconnectat => "Desconnectat",
+        _                             => "No connectat"
+    };
+
+    public void Dispose()
+    {
+        if (_sessioId.HasValue && _sessioHandler is not null)
+            ExamenNotif.DesubscriuSessio(_sessioId.Value, _sessioHandler);
+    }
+
+    private sealed record AlertaExamen(string Text, string Icona, Color Color, DateTime Hora);
+}

@@ -1,0 +1,368 @@
+@page "/examen"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject ExamenNotificationService ExamenNotif
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Entorn Examen — Salesians de Sarrià</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+
+    @if (_fase == Fase.Email)
+    {
+        <!-- Pas 1: introducció de l'email -->
+        <MudCard Elevation="6" Class="pa-6">
+            <MudCardContent>
+                <MudStack Spacing="4" AlignItems="AlignItems.Center">
+                    <MudImage Src="/images/logo2.png" Height="60" />
+                    <MudText Typo="Typo.h5" Align="Align.Center">
+                        <strong>Entorn d'Examen</strong>
+                    </MudText>
+                    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                        Salesians de Sarrià — Dept. d'Informàtica
+                    </MudText>
+
+                    <MudDivider />
+
+                    <MudText Typo="Typo.body1" Align="Align.Center">
+                        Introdueix el teu correu corporatiu per identificar-te.
+                    </MudText>
+
+                    <MudTextField @bind-Value="_email"
+                                  Label="Correu corporatiu"
+                                  Placeholder="nom.cognom@sarria.salesians.cat"
+                                  InputType="InputType.Email"
+                                  FullWidth="true"
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Email"
+                                  OnKeyDown="OnEmailKeyDown" />
+
+                    @if (_suggeriment is not null)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true"
+                                  OnClick="@(() => { _email = _suggeriment; _suggeriment = null; })"
+                                  Style="cursor:pointer;width:100%">
+                            Vols dir: <strong>@_suggeriment</strong>? (clica per confirmar)
+                        </MudAlert>
+                    }
+
+                    @if (_errorEmail is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true">@_errorEmail</MudAlert>
+                    }
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                               Size="Size.Large" OnClick="ValidarEmail"
+                               Disabled="_carregant"
+                               StartIcon="@Icons.Material.Filled.Login">
+                        @if (_carregant) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+                        else { <span>CONTINUAR</span> }
+                    </MudButton>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    }
+
+    @if (_fase == Fase.ConfirmacioMac)
+    {
+        <!-- Pas 2b: MAC nova, demanar confirmació -->
+        <MudCard Elevation="6" Class="pa-6">
+            <MudCardContent>
+                <MudStack Spacing="4" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.DevicesOther"
+                             Color="Color.Warning" Size="Size.Large"
+                             Style="font-size:4rem" />
+                    <MudText Typo="Typo.h6" Align="Align.Center">
+                        Nou dispositiu detectat
+                    </MudText>
+                    <MudText Typo="Typo.body2" Align="Align.Center">
+                        Aquest és el primer cop que et connectes des d'aquest dispositiu.
+                        La teva adreça MAC s'associarà al teu compte.
+                    </MudText>
+                    <MudChip T="string" Color="Color.Secondary" Size="Size.Medium">
+                        @_macObtinguda
+                    </MudChip>
+
+                    @if (_errorCheckin is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true">@_errorCheckin</MudAlert>
+                    }
+
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                                   OnClick="@(() => { _fase = Fase.Email; _errorCheckin = null; })">
+                            Cancel·lar
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Warning"
+                                   OnClick="FerCheckin" Disabled="_carregant">
+                            @if (_carregant) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+                            else { <span>CONFIRMAR I REGISTRAR</span> }
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    }
+
+    @if (_fase == Fase.Connectat && _checkinResp is not null)
+    {
+        <!-- Pas 3: confirmació de connexió -->
+        <MudCard Elevation="6" Class="pa-4">
+            <MudCardContent>
+                <MudStack Spacing="3" AlignItems="AlignItems.Center">
+
+                    <!-- Foto o avatar -->
+                    @if (_checkinResp.Alumne.FotoUrl is not null)
+                    {
+                        <MudAvatar Style="width:96px;height:96px">
+                            <MudImage Src="@_checkinResp.Alumne.FotoUrl"
+                                      Style="width:96px;height:96px;object-fit:cover" />
+                        </MudAvatar>
+                    }
+                    else
+                    {
+                        <MudAvatar Color="Color.Primary" Style="width:96px;height:96px;font-size:2.5rem">
+                            @((_checkinResp.Alumne.Nom?[..1] ?? "") + (_checkinResp.Alumne.Cognoms?[..1] ?? ""))
+                        </MudAvatar>
+                    }
+
+                    <MudText Typo="Typo.h5" Align="Align.Center">
+                        @_checkinResp.Alumne.Nom @_checkinResp.Alumne.Cognoms
+                    </MudText>
+                    <MudChip T="string" Color="Color.Secondary" Size="Size.Small">
+                        @_checkinResp.Alumne.Classe
+                    </MudChip>
+
+                    <MudDivider />
+
+                    @if (!string.IsNullOrWhiteSpace(_checkinResp.Sessio.Titol))
+                    {
+                        <MudText Typo="Typo.subtitle1" Align="Align.Center">
+                            <strong>@_checkinResp.Sessio.Titol</strong>
+                        </MudText>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_checkinResp.Sessio.Descripcio))
+                    {
+                        <MudText Typo="Typo.body2" Align="Align.Center">
+                            @_checkinResp.Sessio.Descripcio
+                        </MudText>
+                    }
+
+                    <MudDivider />
+
+                    <!-- Estat de connexió -->
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <div style="width:14px;height:14px;border-radius:50%;background:#22c55e;
+                                    animation: pulse-green 1.5s infinite"></div>
+                        <MudText Typo="Typo.body1" Color="Color.Success">
+                            <strong>CONNECTAT</strong>
+                        </MudText>
+                    </MudStack>
+
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Últim check-in: @_ultimCheckin.ToLocalTime().ToString("HH:mm:ss")
+                        &nbsp;· Propera actualització en @_segonsRestants s
+                    </MudText>
+
+                    <MudProgressLinear Value="@(100 - _segonsRestants * 100 / CheckinIntervalSegons)"
+                                       Color="Color.Success" Rounded="true" Size="Size.Small"
+                                       Style="width:100%" />
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    }
+
+</MudContainer>
+
+<!-- Diàleg obligatori del missatge del professor -->
+<MudDialog @bind-Visible="_mostrarMissatge">
+    <TitleContent>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.Campaign" Color="Color.Warning" />
+            <MudText Typo="Typo.h6">Missatge del professor</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">
+            @_missatgeProfessor
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Warning"
+                   OnClick="@(() => _mostrarMissatge = false)">
+            He llegit el missatge
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private enum Fase { Email, ConfirmacioMac, Connectat }
+
+    private const int CheckinIntervalSegons = 30;
+
+    private Fase _fase = Fase.Email;
+    private string _email      = "";
+    private string? _suggeriment;
+    private string? _errorEmail;
+    private string? _errorCheckin;
+    private string  _macObtinguda = "";
+    private bool    _carregant;
+
+    private CheckinResponse? _checkinResp;
+    private DateTime _ultimCheckin;
+    private int      _segonsRestants = CheckinIntervalSegons;
+    private System.Threading.Timer? _timer;
+
+    private bool   _mostrarMissatge;
+    private string _missatgeProfessor = "";
+
+    private Func<string, object, Task>? _alumneHandler;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        // Obté la MAC via ARP del costat del servidor — no des del navegador
+        _macObtinguda = await ObtenirMacAsync();
+    }
+
+    private async Task<string> ObtenirMacAsync()
+    {
+        // La MAC s'obté al servidor via la IP del client
+        // En una xarxa local tancada, usem un placeholder o la IP
+        // La MAC real la proporciona el backend DHCP monitor
+        try
+        {
+            var ip = await JS.InvokeAsync<string>("eval",
+                "window.location.hostname");
+            return $"00:00:00:00:00:00"; // el backend la resoldrà via DHCP
+        }
+        catch { return "00:00:00:00:00:00"; }
+    }
+
+    private void OnEmailKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") _ = ValidarEmail();
+    }
+
+    private async Task ValidarEmail()
+    {
+        _errorEmail  = null;
+        _suggeriment = null;
+
+        var email = _email.Trim().ToLower();
+
+        // Suggeriment si falta el domini
+        if (!email.Contains('@'))
+        {
+            _suggeriment = $"{email}@sarria.salesians.cat";
+            StateHasChanged();
+            return;
+        }
+
+        if (!email.EndsWith("@sarria.salesians.cat"))
+        {
+            _errorEmail = "El correu ha d'acabar en @sarria.salesians.cat";
+            StateHasChanged();
+            return;
+        }
+
+        // Prova directament check-in (si la MAC ja era coneguda)
+        await FerCheckin();
+    }
+
+    private async Task FerCheckin()
+    {
+        _carregant   = true;
+        _errorCheckin = null;
+        StateHasChanged();
+
+        var (resp, error) = await Api.ExamenCheckinAsync(
+            new CheckinRequest(_email.Trim(), _macObtinguda));
+
+        _carregant = false;
+
+        if (error is not null)
+        {
+            _errorEmail  = error;
+            _errorCheckin = error;
+            _fase = Fase.Email;
+        }
+        else if (resp is not null)
+        {
+            _checkinResp = resp;
+            _ultimCheckin = DateTime.UtcNow;
+            _fase = Fase.Connectat;
+
+            // Mostra missatge actiu si n'hi ha
+            if (!string.IsNullOrWhiteSpace(resp.Sessio.MissatgeActiu))
+            {
+                _missatgeProfessor = resp.Sessio.MissatgeActiu;
+                _mostrarMissatge   = true;
+            }
+
+            // Subscriu a notificacions de l'alumne
+            SubscriuNotificacions(resp.Alumne.StudentId);
+
+            // Inicia el timer de check-in automàtic
+            IniciaTimer();
+        }
+
+        StateHasChanged();
+    }
+
+    private void SubscriuNotificacions(int studentId)
+    {
+        _alumneHandler = async (eventNom, data) =>
+        {
+            switch (eventNom)
+            {
+                case "MissatgeProfessor" when data is ExamenEventMissatge msg:
+                    _missatgeProfessor = msg.Text;
+                    _mostrarMissatge   = true;
+                    await InvokeAsync(StateHasChanged);
+                    break;
+                case "SessioTancadaGlobal":
+                    // Torna al pas inicial amb avís
+                    _checkinResp = null;
+                    _fase        = Fase.Email;
+                    _errorEmail  = "La sessió d'examen ha finalitzat.";
+                    _ = _timer?.DisposeAsync();
+                    await InvokeAsync(StateHasChanged);
+                    break;
+            }
+        };
+        ExamenNotif.SubscriuAlumne(studentId, _alumneHandler);
+    }
+
+    private void IniciaTimer()
+    {
+        _timer?.Dispose();
+        _segonsRestants = CheckinIntervalSegons;
+
+        _timer = new System.Threading.Timer(async _ =>
+        {
+            _segonsRestants--;
+            if (_segonsRestants <= 0)
+            {
+                _segonsRestants = CheckinIntervalSegons;
+                // Auto check-in
+                if (_checkinResp is not null)
+                {
+                    var (resp, _) = await Api.ExamenCheckinAsync(
+                        new CheckinRequest(_email.Trim(), _macObtinguda));
+                    if (resp is not null) _ultimCheckin = DateTime.UtcNow;
+                }
+            }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+        if (_alumneHandler is not null && _checkinResp is not null)
+            ExamenNotif.DesubscriuAlumne(_checkinResp.Alumne.StudentId, _alumneHandler);
+    }
+}

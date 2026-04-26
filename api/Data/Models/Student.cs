@@ -13,7 +13,11 @@ public class Student
 
     public string NomComplet => $"{Nom} {Cognoms}";
 
+    public string? Dni  { get; set; }   // Per associar foto
+
     public Class                    Class            { get; set; } = null!;
     public ICollection<GroupMember> GroupMemberships { get; set; } = [];
     public ICollection<ModuleExclusion> Exclusions   { get; set; } = [];
+    public ICollection<AlumneMac>       Macs         { get; set; } = [];
+    public ICollection<RegistreConnexio> Registres   { get; set; } = [];
 }

@@ -1,0 +1,10 @@
+$TTL 604800
+@   IN  SOA examen.local. root.examen.local. (
+            2025042501 ; Serial
+            604800     ; Refresh
+            86400      ; Retry
+            2419200    ; Expire
+            604800 )   ; Negative Cache TTL
+@   IN  NS  examen.local.
+@   IN  A   192.168.100.1
+www IN  A   192.168.100.1

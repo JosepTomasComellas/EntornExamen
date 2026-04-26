@@ -7,6 +7,7 @@ volumes:
   redis-data:   # Volum per a Redis (persistència AOF)
   dp-keys:      # Claus de DataProtection (antiforgery, ProtectedLocalStorage)
   api-backups:  # Còpies de seguretat JSON (exportació/importació)
+  fotos-alumnes: # Fotos d'alumnes per a l'Entorn Examen
 
 services:
 
@@ -76,10 +77,18 @@ services:
       Smtp__FromName:               "${SMTP_FROM_NAME}"
       App__WebUrl:                  "${APP_WEB_URL}"
       Redis__ConnectionString:      "redis:6379"
+      Examen__DominiEmail:          "${EXAMEN_DOMINI_EMAIL:-sarria.salesians.cat}"
+      Examen__CheckinIntervalSeconds: "${EXAMEN_CHECKIN_INTERVAL_SECONDS:-30}"
+      Examen__DhcpLeasesPath:       "/data/dhcpd.leases"
+      Examen__DnsLogPath:           "/data/dns-queries.log"
+      Examen__WebWwwrootPath:       "/app/wwwroot"
     expose:
       - "8080"
     volumes:
       - api-backups:/app/backups
+      - fotos-alumnes:/app/wwwroot/fotos/alumnes
+      - /var/lib/dhcp/dhcpd.leases:/data/dhcpd.leases:ro
+      - /var/log/named/queries.log:/data/dns-queries.log:ro
     networks:
       - autoco-net
     depends_on:
@@ -100,6 +109,7 @@ services:
       Redis__ConnectionString: "redis:6379"
     volumes:
       - dp-keys:/app/dp-keys
+      - fotos-alumnes:/app/wwwroot/fotos/alumnes
     networks:
       - autoco-net
     depends_on:

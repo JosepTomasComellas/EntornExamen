@@ -308,6 +308,101 @@ public class ApiClient
         return (bytes, fileName.Trim('"'));
     }
 
+    // ── Entorn Examen ─────────────────────────────────────────────────────────
+
+    public Task<List<SessioExamenDto>?> GetExamenSessionsAsync() =>
+        GetAsync<List<SessioExamenDto>>("/api/examen/sessions");
+
+    public async Task<(SessioExamenDto? Sessio, string? Error)> CreateExamenSessioAsync(
+        CreateSessioRequest req)
+    {
+        var resp = await _http.PostAsync("/api/examen/sessions", Json(req));
+        if (resp.IsSuccessStatusCode)
+            return (await resp.Content.ReadFromJsonAsync<SessioExamenDto>(_json), null);
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(
+                await resp.Content.ReadAsStringAsync());
+            var err = doc.RootElement.TryGetProperty("error", out var e) ? e.GetString() : null;
+            return (null, err ?? "Error desconegut.");
+        }
+        catch { return (null, "Error desconegut."); }
+    }
+
+    public Task<ExamenDashboardDto?> GetExamenDashboardAsync(int sessioId) =>
+        GetAsync<ExamenDashboardDto>($"/api/examen/sessions/{sessioId}/dashboard");
+
+    public Task<bool> TancarExamenSessioAsync(int sessioId) =>
+        PutNoContentAsync($"/api/examen/sessions/{sessioId}/tancar", null);
+
+    public Task<bool> ReobrirExamenSessioAsync(int sessioId) =>
+        PutNoContentAsync($"/api/examen/sessions/{sessioId}/reobrir", null);
+
+    public Task<bool> SetMissatgeExamenAsync(int sessioId, string text) =>
+        PutNoContentAsync($"/api/examen/sessions/{sessioId}/missatge",
+            new MissatgeRequest(text));
+
+    public Task<bool> DeleteMissatgeExamenAsync(int sessioId) =>
+        DeleteAsync($"/api/examen/sessions/{sessioId}/missatge");
+
+    public async Task<(byte[] Content, string FileName)?> ExportarExamenCsvAsync(int sessioId)
+    {
+        var resp = await _http.GetAsync($"/api/examen/sessions/{sessioId}/exportar");
+        if (!resp.IsSuccessStatusCode) { CheckUnauthorized(resp); return null; }
+        var bytes = await resp.Content.ReadAsByteArrayAsync();
+        var fileName = resp.Content.Headers.ContentDisposition?.FileNameStar
+            ?? resp.Content.Headers.ContentDisposition?.FileName
+            ?? $"examen_{sessioId}.csv";
+        return (bytes, fileName.Trim('"'));
+    }
+
+    public async Task<(CheckinResponse? Resp, string? Error)> ExamenCheckinAsync(CheckinRequest req)
+    {
+        var resp = await _http.PostAsync("/api/examen/checkin", Json(req));
+        if (resp.IsSuccessStatusCode)
+            return (await resp.Content.ReadFromJsonAsync<CheckinResponse>(_json), null);
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(
+                await resp.Content.ReadAsStringAsync());
+            var err = doc.RootElement.TryGetProperty("error", out var e) ? e.GetString() : null;
+            return (null, err ?? "Error desconegut.");
+        }
+        catch { return (null, "Error desconegut."); }
+    }
+
+    public async Task<(ImportacioAlumnesResult? Result, string? Error)>
+        ImportarAlumnesExamenAsync(MultipartFormDataContent form)
+    {
+        var resp = await _http.PostAsync("/api/examen/importar-alumnes", form);
+        if (resp.IsSuccessStatusCode)
+            return (await resp.Content.ReadFromJsonAsync<ImportacioAlumnesResult>(_json), null);
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(
+                await resp.Content.ReadAsStringAsync());
+            var err = doc.RootElement.TryGetProperty("error", out var e) ? e.GetString() : null;
+            return (null, err ?? "Error desconegut.");
+        }
+        catch { return (null, "Error desconegut."); }
+    }
+
+    public async Task<(ImportacioFotosResult? Result, string? Error)>
+        ImportarFotosExamenAsync(MultipartFormDataContent form)
+    {
+        var resp = await _http.PostAsync("/api/examen/importar-fotos", form);
+        if (resp.IsSuccessStatusCode)
+            return (await resp.Content.ReadFromJsonAsync<ImportacioFotosResult>(_json), null);
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(
+                await resp.Content.ReadAsStringAsync());
+            var err = doc.RootElement.TryGetProperty("error", out var e) ? e.GetString() : null;
+            return (null, err ?? "Error desconegut.");
+        }
+        catch { return (null, "Error desconegut."); }
+    }
+
     // ── Estadístiques (admin) ─────────────────────────────────────────────────
 
     public Task<AdminStatsDto?> GetAdminStatsAsync() =>

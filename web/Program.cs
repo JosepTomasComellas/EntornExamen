@@ -61,6 +61,10 @@ builder.Services.AddScoped<UserStateService>();
 builder.Services.AddSingleton<ParticipationNotificationService>();
 builder.Services.AddHostedService<ParticipationRedisSubscriber>();
 
+// ── Entorn Examen: notificacions temps real ────────────────────────────────────
+builder.Services.AddSingleton<ExamenNotificationService>();
+builder.Services.AddHostedService<ExamenRedisSubscriber>();
+
 // HTTP client cap a l'API
 builder.Services.AddHttpClient<ApiClient>(client =>
 {

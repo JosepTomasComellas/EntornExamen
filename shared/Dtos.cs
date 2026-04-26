@@ -213,3 +213,83 @@ public record StudentDashboardDto(List<StudentActivityDto> Activities);
 public record StudentActivityDto(
     int Id, string Name, string? Description, bool IsOpen,
     string GroupName, int GroupId, int TotalToEvaluate, int AlreadyEvaluated);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENTORN EXAMEN
+// ═══════════════════════════════════════════════════════════════════════════
+
+public enum EstatConnexioDto
+{
+    Connectat, SenseCheckin, Desconnectat, NoConnectat
+}
+
+// ─── Sessions d'examen ───────────────────────────────────────────────────────
+public record SessioExamenDto(
+    int Id, int ClassId, string ClassName, int ProfessorId, string ProfessorNom,
+    string? Titol, string? Descripcio, string? MissatgeActiu,
+    DateTime IniciadaAt, DateTime? TancadaAt, bool Activa,
+    int TotalAlumnes, int AlumnesConnectats);
+
+public record CreateSessioRequest(int ClassId, string? Titol, string? Descripcio);
+
+public record MissatgeRequest(string Text);
+
+// ─── Registres de connexió ───────────────────────────────────────────────────
+public record RegistreConnexioDto(
+    int Id, int SessioId,
+    int? StudentId, string? StudentNom, string? StudentCognoms,
+    string? StudentEmail, int? StudentNumLlista, string? FotoUrl,
+    string MacAddress, string? IpAssignada,
+    DateTime ConnectatAt, DateTime? DesconnectatAt, DateTime? UltimCheckinAt,
+    EstatConnexioDto Estat,
+    List<PeticioTdnsDto> DnsRecents);
+
+public record PeticioTdnsDto(
+    int Id, string Domini, DateTime Timestamp, bool EsExterna);
+
+// ─── Check-in alumne ─────────────────────────────────────────────────────────
+public record CheckinRequest(string Email, string Mac);
+
+public record CheckinResponse(
+    CheckinAlumneInfo Alumne,
+    CheckinSessioInfo Sessio);
+
+public record CheckinAlumneInfo(
+    int StudentId, string Nom, string Cognoms, string Classe, string? FotoUrl);
+
+public record CheckinSessioInfo(
+    int SessioId, string? Titol, string? Descripcio, string? MissatgeActiu);
+
+// ─── Esdeveniments DHCP / DNS ────────────────────────────────────────────────
+public record DhcpEventRequest(string Mac, string? Ip, string Event);  // "connected" | "disconnected"
+
+public record DnsEventRequest(string Ip, string Domini, DateTime Timestamp);
+
+// ─── Dashboard professor ─────────────────────────────────────────────────────
+public record ExamenDashboardDto(
+    SessioExamenDto Sessio,
+    List<ExamenAlumneDto> Alumnes);
+
+public record ExamenAlumneDto(
+    int? StudentId, string? Nom, string? Cognoms, string? Email,
+    int? NumLlista, string? FotoUrl,
+    string MacAddress, string? IpAssignada,
+    DateTime? UltimCheckinAt, EstatConnexioDto Estat,
+    List<PeticioTdnsDto> DnsRecents);
+
+// ─── Importació alumnes ───────────────────────────────────────────────────────
+public record ImportacioAlumnesResult(
+    int Importats, int Actualitzats, int Saltats, List<string> Errors);
+
+public record ImportacioFotosResult(
+    int Importades, List<string> NoTrobades, List<string> Errors);
+
+// ─── Events SignalR (publicats per Redis) ─────────────────────────────────────
+public record ExamenEventAlumne(
+    int? StudentId, string? Nom, string? Cognoms,
+    string? Ip, string Mac, DateTime Timestamp);
+
+public record ExamenEventDns(
+    int? StudentId, string? Nom, string Domini, DateTime Timestamp);
+
+public record ExamenEventMissatge(string Text);

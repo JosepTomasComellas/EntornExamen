@@ -1,0 +1,621 @@
+using AutoCo.Api.Data;
+using AutoCo.Api.Data.Models;
+using AutoCo.Api.Hubs;
+using AutoCo.Shared.DTOs;
+using Microsoft.EntityFrameworkCore;
+using System.IO.Compression;
+using System.Text;
+using System.Text.RegularExpressions;
+
+namespace AutoCo.Api.Services;
+
+public interface IExamenService
+{
+    Task<List<SessioExamenDto>> GetSessionsAsync(int professorId, bool isAdmin);
+    Task<(SessioExamenDto? Sessio, string? Error)> CreateSessioAsync(CreateSessioRequest req, int professorId);
+    Task<ExamenDashboardDto?> GetDashboardAsync(int sessioId, int professorId, bool isAdmin);
+    Task<(bool Ok, string? Error)> TancarSessioAsync(int sessioId, int professorId, bool isAdmin);
+    Task<(bool Ok, string? Error)> ReobrirSessioAsync(int sessioId, int professorId, bool isAdmin);
+    Task<(bool Ok, string? Error)> SetMissatgeAsync(int sessioId, string? text, int professorId, bool isAdmin);
+    Task<(byte[] Content, string FileName)?> ExportarCsvAsync(int sessioId, int professorId, bool isAdmin);
+    Task<(CheckinResponse? Resp, string? Error)> CheckinAsync(CheckinRequest req);
+    Task ProcessDhcpEventAsync(DhcpEventRequest req);
+    Task ProcessDnsEventAsync(DnsEventRequest req);
+    Task<(ImportacioAlumnesResult Result, string? Error)> ImportarAlumnesAsync(Stream htmlStream, int professorId, bool isAdmin);
+    Task<(ImportacioFotosResult Result, string? Error)> ImportarFotosAsync(Stream zipStream, string wwwrootPath);
+}
+
+public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config) : IExamenService
+{
+    private static string NormalitzaMac(string mac) =>
+        mac.Trim().ToLowerInvariant();
+
+    private static string FotoUrl(int studentId) =>
+        $"/fotos/alumnes/{studentId}.jpg";
+
+    private static string? FotoUrlSiExisteix(int studentId, string wwwrootPath)
+    {
+        var path = Path.Combine(wwwrootPath, "fotos", "alumnes", $"{studentId}.jpg");
+        return File.Exists(path) ? FotoUrl(studentId) : null;
+    }
+
+    private static RegistreConnexioDto ToDto(RegistreConnexio r, int maxDns = 10) =>
+        new(r.Id, r.SessioId,
+            r.StudentId, r.Student?.Nom, r.Student?.Cognoms,
+            r.Student?.Email, r.Student?.NumLlista,
+            r.StudentId.HasValue ? FotoUrl(r.StudentId.Value) : null,
+            r.MacAddress, r.IpAssignada,
+            r.ConnectatAt, r.DesconnectatAt, r.UltimCheckinAt,
+            (EstatConnexioDto)(int)r.Estat,
+            r.PeticiosDns.OrderByDescending(p => p.Timestamp).Take(maxDns)
+                .Select(p => new PeticioTdnsDto(p.Id, p.Domini, p.Timestamp, p.EsExterna))
+                .ToList());
+
+    private static SessioExamenDto ToSessioDto(SessioExamen s, int total = 0, int connectats = 0) =>
+        new(s.Id, s.ClassId, s.Class?.Name ?? "", s.ProfessorId, s.Professor?.NomComplet ?? "",
+            s.Titol, s.Descripcio, s.MissatgeActiu,
+            s.IniciadaAt, s.TancadaAt, s.Activa, total, connectats);
+
+    // ─── Sessions ─────────────────────────────────────────────────────────────
+
+    public async Task<List<SessioExamenDto>> GetSessionsAsync(int professorId, bool isAdmin)
+    {
+        var q = db.SessionsExamen
+            .Include(s => s.Class)
+            .Include(s => s.Professor)
+            .Include(s => s.Registres)
+            .AsQueryable();
+
+        if (!isAdmin)
+            q = q.Where(s => s.ProfessorId == professorId);
+
+        var sessions = await q.OrderByDescending(s => s.IniciadaAt).ToListAsync();
+
+        return sessions.Select(s =>
+        {
+            var connectats = s.Registres.Count(r => r.Estat == EstatConnexio.Connectat || r.Estat == EstatConnexio.SenseCheckin);
+            return ToSessioDto(s, s.Registres.Count, connectats);
+        }).ToList();
+    }
+
+    public async Task<(SessioExamenDto? Sessio, string? Error)> CreateSessioAsync(
+        CreateSessioRequest req, int professorId)
+    {
+        // Restricció: no pot haver-hi dues sessions actives per la mateixa classe
+        var existent = await db.SessionsExamen
+            .FirstOrDefaultAsync(s => s.ClassId == req.ClassId && s.Activa);
+        if (existent is not null)
+            return (null, "Ja hi ha una sessió activa per a aquesta classe.");
+
+        var classe = await db.Classes.FindAsync(req.ClassId);
+        if (classe is null)
+            return (null, "Classe no trobada.");
+
+        var sessio = new SessioExamen
+        {
+            ClassId     = req.ClassId,
+            ProfessorId = professorId,
+            Titol       = req.Titol?.Trim(),
+            Descripcio  = req.Descripcio?.Trim(),
+            IniciadaAt  = DateTime.UtcNow,
+            Activa      = true
+        };
+        db.SessionsExamen.Add(sessio);
+        await db.SaveChangesAsync();
+
+        await db.Entry(sessio).Reference(s => s.Class).LoadAsync();
+        await db.Entry(sessio).Reference(s => s.Professor).LoadAsync();
+        return (ToSessioDto(sessio), null);
+    }
+
+    public async Task<ExamenDashboardDto?> GetDashboardAsync(
+        int sessioId, int professorId, bool isAdmin)
+    {
+        var sessio = await db.SessionsExamen
+            .Include(s => s.Class)
+            .Include(s => s.Professor)
+            .Include(s => s.Registres)
+                .ThenInclude(r => r.Student)
+            .Include(s => s.Registres)
+                .ThenInclude(r => r.PeticiosDns)
+            .FirstOrDefaultAsync(s => s.Id == sessioId &&
+                (isAdmin || s.ProfessorId == professorId));
+
+        if (sessio is null) return null;
+
+        var connectats = sessio.Registres.Count(r =>
+            r.Estat is EstatConnexio.Connectat or EstatConnexio.SenseCheckin);
+
+        var sessioDto = ToSessioDto(sessio, sessio.Registres.Count, connectats);
+
+        var alumnes = sessio.Registres
+            .OrderBy(r => r.Student?.NumLlista ?? int.MaxValue)
+            .ThenBy(r => r.Student?.Cognoms ?? r.MacAddress)
+            .Select(r => new ExamenAlumneDto(
+                r.StudentId, r.Student?.Nom, r.Student?.Cognoms, r.Student?.Email,
+                r.Student?.NumLlista,
+                r.StudentId.HasValue ? FotoUrl(r.StudentId.Value) : null,
+                r.MacAddress, r.IpAssignada,
+                r.UltimCheckinAt, (EstatConnexioDto)(int)r.Estat,
+                r.PeticiosDns.OrderByDescending(p => p.Timestamp).Take(10)
+                    .Select(p => new PeticioTdnsDto(p.Id, p.Domini, p.Timestamp, p.EsExterna))
+                    .ToList()))
+            .ToList();
+
+        return new ExamenDashboardDto(sessioDto, alumnes);
+    }
+
+    public async Task<(bool Ok, string? Error)> TancarSessioAsync(
+        int sessioId, int professorId, bool isAdmin)
+    {
+        var sessio = await db.SessionsExamen
+            .Include(s => s.Registres)
+            .FirstOrDefaultAsync(s => s.Id == sessioId &&
+                (isAdmin || s.ProfessorId == professorId));
+        if (sessio is null) return (false, "Sessió no trobada.");
+
+        sessio.Activa     = false;
+        sessio.TancadaAt  = DateTime.UtcNow;
+
+        // Desconnecta tots els registres actius
+        foreach (var r in sessio.Registres.Where(r =>
+            r.Estat is EstatConnexio.Connectat or EstatConnexio.SenseCheckin))
+        {
+            r.Estat           = EstatConnexio.Desconnectat;
+            r.DesconnectatAt  = DateTime.UtcNow;
+        }
+        await db.SaveChangesAsync();
+
+        // Notifica tots els alumnes que la sessió ha tancat
+        _ = hub.NotificaSessioTancadaGlobalAsync(sessioId);
+        return (true, null);
+    }
+
+    public async Task<(bool Ok, string? Error)> ReobrirSessioAsync(
+        int sessioId, int professorId, bool isAdmin)
+    {
+        // Comprova que no hi hagi una altra sessió activa per la mateixa classe
+        var sessio = await db.SessionsExamen
+            .FirstOrDefaultAsync(s => s.Id == sessioId &&
+                (isAdmin || s.ProfessorId == professorId));
+        if (sessio is null) return (false, "Sessió no trobada.");
+
+        var conflicte = await db.SessionsExamen
+            .AnyAsync(s => s.ClassId == sessio.ClassId && s.Activa && s.Id != sessioId);
+        if (conflicte)
+            return (false, "Ja hi ha una altra sessió activa per a aquesta classe.");
+
+        sessio.Activa    = true;
+        sessio.TancadaAt = null;
+        await db.SaveChangesAsync();
+        return (true, null);
+    }
+
+    public async Task<(bool Ok, string? Error)> SetMissatgeAsync(
+        int sessioId, string? text, int professorId, bool isAdmin)
+    {
+        var sessio = await db.SessionsExamen
+            .Include(s => s.Registres)
+            .FirstOrDefaultAsync(s => s.Id == sessioId &&
+                (isAdmin || s.ProfessorId == professorId));
+        if (sessio is null) return (false, "Sessió no trobada.");
+
+        sessio.MissatgeActiu = string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+        await db.SaveChangesAsync();
+
+        if (sessio.MissatgeActiu is not null)
+        {
+            // Notifica el professor (per reflectir el canvi a la sessió)
+            _ = hub.NotificaMissatgeActualitzatSessioAsync(sessioId,
+                new ExamenEventMissatge(sessio.MissatgeActiu));
+
+            // Notifica cada alumne connectat individualment
+            var studentIds = sessio.Registres
+                .Where(r => r.StudentId.HasValue &&
+                    r.Estat is EstatConnexio.Connectat or EstatConnexio.SenseCheckin)
+                .Select(r => r.StudentId!.Value)
+                .Distinct();
+
+            foreach (var sid in studentIds)
+                _ = hub.NotificaMissatgeProfessorAsync(sid,
+                    new ExamenEventMissatge(sessio.MissatgeActiu));
+        }
+        return (true, null);
+    }
+
+    // ─── Exportació CSV ───────────────────────────────────────────────────────
+
+    public async Task<(byte[] Content, string FileName)?> ExportarCsvAsync(
+        int sessioId, int professorId, bool isAdmin)
+    {
+        var sessio = await db.SessionsExamen
+            .Include(s => s.Class)
+            .Include(s => s.Registres)
+                .ThenInclude(r => r.Student)
+            .Include(s => s.Registres)
+                .ThenInclude(r => r.PeticiosDns)
+            .FirstOrDefaultAsync(s => s.Id == sessioId &&
+                (isAdmin || s.ProfessorId == professorId));
+        if (sessio is null) return null;
+
+        var sb = new StringBuilder();
+        sb.AppendLine(string.Join(";",
+            "\"NumLlista\"", "\"Nom\"", "\"Cognoms\"", "\"Email\"",
+            "\"MAC\"", "\"IP\"", "\"ConnectatAt\"", "\"UltimCheckin\"",
+            "\"Estat\"", "\"DNS_Externes\""));
+
+        foreach (var r in sessio.Registres
+            .OrderBy(r => r.Student?.NumLlista ?? int.MaxValue)
+            .ThenBy(r => r.Student?.Cognoms ?? r.MacAddress))
+        {
+            var dns = r.PeticiosDns.Where(p => p.EsExterna)
+                .Select(p => p.Domini).Distinct().Take(20);
+            sb.AppendLine(string.Join(";",
+                r.Student?.NumLlista.ToString() ?? "",
+                $"\"{r.Student?.Nom ?? ""}\"",
+                $"\"{r.Student?.Cognoms ?? ""}\"",
+                $"\"{r.Student?.Email ?? ""}\"",
+                $"\"{r.MacAddress}\"",
+                $"\"{r.IpAssignada ?? ""}\"",
+                $"\"{r.ConnectatAt:dd/MM/yyyy HH:mm:ss}\"",
+                $"\"{r.UltimCheckinAt?.ToString("dd/MM/yyyy HH:mm:ss") ?? ""}\"",
+                $"\"{r.Estat}\"",
+                $"\"{string.Join(" | ", dns)}\""));
+        }
+
+        var titol = sessio.Titol?.Replace(" ", "_") ?? "sessio";
+        var nom   = $"examen_{titol}_{DateTime.Now:yyyyMMdd}.csv";
+        return (Encoding.UTF8.GetPreamble()
+            .Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray(), nom);
+    }
+
+    // ─── Check-in alumne ──────────────────────────────────────────────────────
+
+    public async Task<(CheckinResponse? Resp, string? Error)> CheckinAsync(CheckinRequest req)
+    {
+        var domini = config["Examen:DominiEmail"] ?? "sarria.salesians.cat";
+        if (!req.Email.EndsWith($"@{domini}", StringComparison.OrdinalIgnoreCase))
+            return (null, $"L'email ha d'acabar en @{domini}.");
+
+        var mac = NormalitzaMac(req.Mac);
+
+        var student = await db.Students
+            .Include(s => s.Class)
+            .Include(s => s.Macs)
+            .FirstOrDefaultAsync(s => s.Email.ToLower() == req.Email.Trim().ToLower());
+
+        if (student is null)
+            return (null, "Email no reconegut al sistema.");
+
+        // Busca sessió activa per la classe de l'alumne
+        var sessio = await db.SessionsExamen
+            .FirstOrDefaultAsync(s => s.ClassId == student.ClassId && s.Activa);
+
+        if (sessio is null)
+            return (null, "No hi ha examen actiu per a la teva classe.");
+
+        // Associa MAC si no existia
+        if (!student.Macs.Any(m => m.Mac == mac))
+        {
+            db.AlumneMacs.Add(new AlumneMac
+            {
+                StudentId    = student.Id,
+                Mac          = mac,
+                PrimerCopVist = DateTime.UtcNow
+            });
+        }
+
+        // Crea o actualitza RegistreConnexio
+        var registre = await db.RegistresConnexio
+            .FirstOrDefaultAsync(r => r.SessioId == sessio.Id && r.StudentId == student.Id);
+
+        var ara = DateTime.UtcNow;
+        if (registre is null)
+        {
+            registre = new RegistreConnexio
+            {
+                SessioId       = sessio.Id,
+                StudentId      = student.Id,
+                MacAddress     = mac,
+                ConnectatAt    = ara,
+                UltimCheckinAt = ara,
+                Estat          = EstatConnexio.Connectat
+            };
+            db.RegistresConnexio.Add(registre);
+        }
+        else
+        {
+            registre.MacAddress     = mac;
+            registre.UltimCheckinAt = ara;
+            registre.Estat          = EstatConnexio.Connectat;
+        }
+
+        await db.SaveChangesAsync();
+
+        // Notifica el professor
+        _ = hub.NotificaNouCheckinAsync(sessio.Id, new ExamenEventAlumne(
+            student.Id, student.Nom, student.Cognoms, null, mac, ara));
+
+        return (new CheckinResponse(
+            new CheckinAlumneInfo(student.Id, student.Nom, student.Cognoms,
+                student.Class.Name, FotoUrl(student.Id)),
+            new CheckinSessioInfo(sessio.Id, sessio.Titol, sessio.Descripcio, sessio.MissatgeActiu)),
+            null);
+    }
+
+    // ─── Processament DHCP ────────────────────────────────────────────────────
+
+    public async Task ProcessDhcpEventAsync(DhcpEventRequest req)
+    {
+        var mac = NormalitzaMac(req.Mac);
+        var ara = DateTime.UtcNow;
+
+        // Busca sessions actives
+        var sessions = await db.SessionsExamen.Where(s => s.Activa).Select(s => s.Id).ToListAsync();
+        if (sessions.Count == 0) return;
+
+        var registre = await db.RegistresConnexio
+            .Include(r => r.Student)
+            .FirstOrDefaultAsync(r => sessions.Contains(r.SessioId) && r.MacAddress == mac);
+
+        if (req.Event == "connected")
+        {
+            if (registre is not null)
+            {
+                registre.IpAssignada = req.Ip;
+                registre.Estat       = EstatConnexio.Connectat;
+                await db.SaveChangesAsync();
+
+                _ = hub.NotificaAlumneConnectatAsync(registre.SessioId, new ExamenEventAlumne(
+                    registre.StudentId, registre.Student?.Nom, registre.Student?.Cognoms,
+                    req.Ip, mac, ara));
+            }
+            else
+            {
+                // MAC desconeguda — registra igualment
+                var sessioActiva = await db.SessionsExamen.FirstOrDefaultAsync(s => s.Activa);
+                if (sessioActiva is not null)
+                {
+                    var nouRegistre = new RegistreConnexio
+                    {
+                        SessioId   = sessioActiva.Id,
+                        MacAddress = mac,
+                        IpAssignada = req.Ip,
+                        ConnectatAt = ara,
+                        Estat       = EstatConnexio.Connectat
+                    };
+                    db.RegistresConnexio.Add(nouRegistre);
+                    await db.SaveChangesAsync();
+
+                    _ = hub.NotificaMacDesconegudaAsync(sessioActiva.Id, new ExamenEventAlumne(
+                        null, null, null, req.Ip, mac, ara));
+                }
+            }
+        }
+        else if (req.Event == "disconnected" && registre is not null)
+        {
+            registre.Estat          = EstatConnexio.Desconnectat;
+            registre.DesconnectatAt = ara;
+            await db.SaveChangesAsync();
+
+            _ = hub.NotificaAlumneDesconnectatAsync(registre.SessioId, new ExamenEventAlumne(
+                registre.StudentId, registre.Student?.Nom, registre.Student?.Cognoms,
+                registre.IpAssignada, mac, ara));
+        }
+    }
+
+    // ─── Processament DNS ─────────────────────────────────────────────────────
+
+    public async Task ProcessDnsEventAsync(DnsEventRequest req)
+    {
+        var registre = await db.RegistresConnexio
+            .Include(r => r.Student)
+            .FirstOrDefaultAsync(r => r.IpAssignada == req.Ip &&
+                r.Estat != EstatConnexio.Desconnectat);
+        if (registre is null) return;
+
+        var esExterna = !req.Domini.EndsWith(".examen.local",
+            StringComparison.OrdinalIgnoreCase) && req.Domini != "examen.local";
+
+        db.PeticiosDns.Add(new PeticioTdns
+        {
+            RegistreId = registre.Id,
+            Domini     = req.Domini,
+            Timestamp  = req.Timestamp,
+            EsExterna  = esExterna
+        });
+        await db.SaveChangesAsync();
+
+        if (esExterna)
+        {
+            _ = hub.NotificaNovaPeticioExternaAsync(registre.SessioId, new ExamenEventDns(
+                registre.StudentId, registre.Student?.Nom, req.Domini, req.Timestamp));
+        }
+    }
+
+    // ─── Importació alumnes (HTML disfressat de XLS) ──────────────────────────
+
+    public async Task<(ImportacioAlumnesResult Result, string? Error)> ImportarAlumnesAsync(
+        Stream htmlStream, int professorId, bool isAdmin)
+    {
+        if (!isAdmin) return (new ImportacioAlumnesResult(0, 0, 0, []), "Sense permisos.");
+
+        string htmlContent;
+        using (var reader = new StreamReader(htmlStream, Encoding.GetEncoding(1252)))
+            htmlContent = await reader.ReadToEndAsync();
+
+        // Extrau nom de classe del títol o de la primera fila significativa
+        var nomClasse = ExtrauNomClasse(htmlContent);
+        if (string.IsNullOrWhiteSpace(nomClasse))
+            return (new ImportacioAlumnesResult(0, 0, 0, ["No s'ha pogut detectar el nom de la classe."]), null);
+
+        var classe = await db.Classes.FirstOrDefaultAsync(c => c.Name == nomClasse);
+        if (classe is null)
+        {
+            classe = new Class { Name = nomClasse };
+            db.Classes.Add(classe);
+            await db.SaveChangesAsync();
+        }
+
+        var files = ParseFilesHtml(htmlContent);
+        var importats = 0; var actualitzats = 0; var saltats = 0;
+        var errors = new List<string>();
+
+        foreach (var fila in files)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(fila.Baixa)) { saltats++; continue; }
+                if (string.IsNullOrWhiteSpace(fila.Nom) && string.IsNullOrWhiteSpace(fila.Cognoms))
+                    { saltats++; continue; }
+
+                var email = string.IsNullOrWhiteSpace(fila.Email)
+                    ? GeneraEmail(fila.Nom, fila.Cognoms)
+                    : fila.Email.Trim().ToLower();
+
+                var student = await db.Students.FirstOrDefaultAsync(s => s.Email == email);
+                if (student is null)
+                {
+                    student = new Student
+                    {
+                        ClassId      = classe.Id,
+                        Nom          = fila.Nom.Trim(),
+                        Cognoms      = fila.Cognoms.Trim(),
+                        Email        = email,
+                        NumLlista    = fila.NumLlista,
+                        Dni          = fila.Dni?.Trim(),
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(PasswordHelper.Generate())
+                    };
+                    db.Students.Add(student);
+                    importats++;
+                }
+                else
+                {
+                    student.Nom      = fila.Nom.Trim();
+                    student.Cognoms  = fila.Cognoms.Trim();
+                    student.NumLlista = fila.NumLlista;
+                    if (!string.IsNullOrWhiteSpace(fila.Dni))
+                        student.Dni = fila.Dni.Trim();
+                    actualitzats++;
+                }
+            }
+            catch (Exception ex) { errors.Add($"Fila {fila.NumLlista}: {ex.Message}"); }
+        }
+
+        await db.SaveChangesAsync();
+        return (new ImportacioAlumnesResult(importats, actualitzats, saltats, errors), null);
+    }
+
+    private static string? ExtrauNomClasse(string html)
+    {
+        // Cerca patrons com "S1SX (2025)" o "ASIX1 2025"
+        var m = Regex.Match(html, @"([A-Z][A-Z0-9]{2,8})\s*\(?\d{4}\)?",
+            RegexOptions.IgnoreCase);
+        return m.Success ? m.Value.Trim() : null;
+    }
+
+    private static List<FilaAlumne> ParseFilesHtml(string html)
+    {
+        var result = new List<FilaAlumne>();
+        // Cerca files de taula <tr>
+        var rowMatches = Regex.Matches(html, @"<tr[^>]*>(.*?)</tr>",
+            RegexOptions.Singleline | RegexOptions.IgnoreCase);
+
+        foreach (Match row in rowMatches)
+        {
+            var cells = Regex.Matches(row.Groups[1].Value, @"<t[dh][^>]*>(.*?)</t[dh]>",
+                RegexOptions.Singleline | RegexOptions.IgnoreCase)
+                .Select(m => StripHtml(m.Groups[1].Value).Trim())
+                .ToList();
+
+            if (cells.Count < 4) continue;
+            if (!int.TryParse(cells[0], out var num)) continue; // capçalera
+
+            result.Add(new FilaAlumne(
+                num,
+                cells.ElementAtOrDefault(1) ?? "",  // Cognoms
+                cells.ElementAtOrDefault(2) ?? "",  // Nom
+                cells.ElementAtOrDefault(3),        // DNI
+                cells.ElementAtOrDefault(4),        // Baixa
+                cells.ElementAtOrDefault(5)));      // Email
+        }
+        return result;
+    }
+
+    private static string StripHtml(string html) =>
+        Regex.Replace(html, "<[^>]+>", "").Trim();
+
+    private static string GeneraEmail(string nom, string cognoms)
+    {
+        var n = Normalitza(nom.Split(' ')[0]);
+        var c = Normalitza(cognoms.Split(' ')[0]);
+        return $"{n}.{c}@sarria.salesians.cat";
+    }
+
+    private static readonly char[] _accentFrom = "àáâãäåèéêëìíîïòóôõöùúûüçñÀÁÂÃÄÅÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜÇÑ".ToCharArray();
+    private static readonly char[] _accentTo   = "aaaaaaeeeeiiiioooooauuuucnAAAAAAEEEEIIIIOOOOOUUUUCN".ToCharArray();
+
+    private static string Normalitza(string s)
+    {
+        var sb = new StringBuilder();
+        foreach (var c in s.ToLower())
+        {
+            var idx = Array.IndexOf(_accentFrom, c);
+            sb.Append(idx >= 0 ? _accentTo[idx] : c);
+        }
+        return Regex.Replace(sb.ToString(), "[^a-z0-9]", "");
+    }
+
+    private sealed record FilaAlumne(
+        int NumLlista, string Cognoms, string Nom, string? Dni, string? Baixa, string? Email);
+
+    // ─── Importació fotos ─────────────────────────────────────────────────────
+
+    public async Task<(ImportacioFotosResult Result, string? Error)> ImportarFotosAsync(
+        Stream zipStream, string wwwrootPath)
+    {
+        var destDir = Path.Combine(wwwrootPath, "fotos", "alumnes");
+        Directory.CreateDirectory(destDir);
+
+        var importades = 0;
+        var noTrobades = new List<string>();
+        var errors = new List<string>();
+
+        try
+        {
+            using var zip = new ZipArchive(zipStream, ZipArchiveMode.Read);
+            foreach (var entry in zip.Entries.Where(e =>
+                e.Name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                e.Name.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase)))
+            {
+                // Nom del fitxer = DNI/NIE
+                var dni = Path.GetFileNameWithoutExtension(entry.Name).Trim().ToUpper();
+                var student = await db.Students
+                    .FirstOrDefaultAsync(s => s.Dni != null &&
+                        s.Dni.ToUpper() == dni);
+
+                if (student is null)
+                {
+                    noTrobades.Add(entry.Name);
+                    continue;
+                }
+
+                try
+                {
+                    var dest = Path.Combine(destDir, $"{student.Id}.jpg");
+                    using var entryStream = entry.Open();
+                    using var fs = File.Create(dest);
+                    await entryStream.CopyToAsync(fs);
+                    importades++;
+                }
+                catch (Exception ex) { errors.Add($"{entry.Name}: {ex.Message}"); }
+            }
+        }
+        catch (Exception ex)
+        {
+            return (new ImportacioFotosResult(0, [], [ex.Message]), null);
+        }
+
+        return (new ImportacioFotosResult(importades, noTrobades, errors), null);
+    }
+}

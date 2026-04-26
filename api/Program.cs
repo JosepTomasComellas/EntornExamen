@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using AutoCo.Api.Data;
 using AutoCo.Shared.DTOs;
 using AutoCo.Api.Services;
+using AutoCo.Api.Hubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -50,6 +51,14 @@ builder.Services.AddScoped<IEvaluationService, EvaluationService>();
 builder.Services.AddScoped<IResultsService,    ResultsService>();
 builder.Services.AddScoped<IEmailService,      EmailService>();
 builder.Services.AddScoped<IBackupService,     BackupService>();
+builder.Services.AddScoped<IExamenService,     ExamenService>();
+
+// ── Entorn Examen: hub de notificació (publicador Redis) ──────────────────────
+builder.Services.AddSingleton<ExamenHub>();
+
+// ── Entorn Examen: serveis background ─────────────────────────────────────────
+builder.Services.AddHostedService<DhcpMonitorService>();
+builder.Services.AddHostedService<DnsMonitorService>();
 
 // ── Redis (caché de resultats) ─────────────────────────────────────────────────
 var redisConn = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
@@ -169,6 +178,90 @@ using (var scope = app.Services.CreateScope())
                 ON [ProfessorLogins] ([ProfessorId]);
             CREATE INDEX [IX_ProfessorLogins_CreatedAt]
                 ON [ProfessorLogins] ([CreatedAt]);
+        END
+
+        -- ── Entorn Examen ────────────────────────────────────────────────────
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                       WHERE TABLE_NAME = 'Students' AND COLUMN_NAME = 'Dni')
+        BEGIN
+            ALTER TABLE [Students] ADD [Dni] NVARCHAR(20) NULL;
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'AlumneMacs')
+        BEGIN
+            CREATE TABLE [AlumneMacs] (
+                [Id]            INT           NOT NULL IDENTITY(1,1),
+                [StudentId]     INT           NOT NULL,
+                [Mac]           NVARCHAR(17)  NOT NULL,
+                [Dispositiu]    NVARCHAR(100) NULL,
+                [PrimerCopVist] DATETIME2     NOT NULL DEFAULT GETUTCDATE(),
+                CONSTRAINT [PK_AlumneMacs] PRIMARY KEY ([Id]),
+                CONSTRAINT [FK_AlumneMacs_Students_StudentId]
+                    FOREIGN KEY ([StudentId]) REFERENCES [Students]([Id]) ON DELETE CASCADE
+            );
+            CREATE UNIQUE INDEX [IX_AlumneMacs_Mac] ON [AlumneMacs] ([Mac]);
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'SessionsExamen')
+        BEGIN
+            CREATE TABLE [SessionsExamen] (
+                [Id]            INT           NOT NULL IDENTITY(1,1),
+                [ClassId]       INT           NOT NULL,
+                [ProfessorId]   INT           NOT NULL,
+                [Titol]         NVARCHAR(300) NULL,
+                [Descripcio]    NVARCHAR(MAX) NULL,
+                [MissatgeActiu] NVARCHAR(MAX) NULL,
+                [IniciadaAt]    DATETIME2     NOT NULL DEFAULT GETUTCDATE(),
+                [TancadaAt]     DATETIME2     NULL,
+                [Activa]        BIT           NOT NULL DEFAULT 1,
+                CONSTRAINT [PK_SessionsExamen] PRIMARY KEY ([Id]),
+                CONSTRAINT [FK_SessionsExamen_Classes_ClassId]
+                    FOREIGN KEY ([ClassId]) REFERENCES [Classes]([Id]) ON DELETE CASCADE,
+                CONSTRAINT [FK_SessionsExamen_Professors_ProfessorId]
+                    FOREIGN KEY ([ProfessorId]) REFERENCES [Professors]([Id])
+            );
+            CREATE INDEX [IX_SessionsExamen_ClassId_Activa]
+                ON [SessionsExamen] ([ClassId], [Activa]);
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'RegistresConnexio')
+        BEGIN
+            CREATE TABLE [RegistresConnexio] (
+                [Id]              INT          NOT NULL IDENTITY(1,1),
+                [SessioId]        INT          NOT NULL,
+                [StudentId]       INT          NULL,
+                [MacAddress]      NVARCHAR(17) NOT NULL,
+                [IpAssignada]     NVARCHAR(15) NULL,
+                [ConnectatAt]     DATETIME2    NOT NULL DEFAULT GETUTCDATE(),
+                [DesconnectatAt]  DATETIME2    NULL,
+                [UltimCheckinAt]  DATETIME2    NULL,
+                [Estat]           INT          NOT NULL DEFAULT 3, -- NoConnectat
+                CONSTRAINT [PK_RegistresConnexio] PRIMARY KEY ([Id]),
+                CONSTRAINT [FK_RegistresConnexio_SessionsExamen_SessioId]
+                    FOREIGN KEY ([SessioId]) REFERENCES [SessionsExamen]([Id]) ON DELETE CASCADE,
+                CONSTRAINT [FK_RegistresConnexio_Students_StudentId]
+                    FOREIGN KEY ([StudentId]) REFERENCES [Students]([Id])
+            );
+            CREATE INDEX [IX_RegistresConnexio_SessioId_Mac]
+                ON [RegistresConnexio] ([SessioId], [MacAddress]);
+            CREATE INDEX [IX_RegistresConnexio_IpAssignada]
+                ON [RegistresConnexio] ([IpAssignada]);
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'PeticiosDns')
+        BEGIN
+            CREATE TABLE [PeticiosDns] (
+                [Id]         INT           NOT NULL IDENTITY(1,1),
+                [RegistreId] INT           NOT NULL,
+                [Domini]     NVARCHAR(253) NOT NULL,
+                [Timestamp]  DATETIME2     NOT NULL DEFAULT GETUTCDATE(),
+                [EsExterna]  BIT           NOT NULL DEFAULT 0,
+                CONSTRAINT [PK_PeticiosDns] PRIMARY KEY ([Id]),
+                CONSTRAINT [FK_PeticiosDns_RegistresConnexio_RegistreId]
+                    FOREIGN KEY ([RegistreId]) REFERENCES [RegistresConnexio]([Id]) ON DELETE CASCADE
+            );
+            CREATE INDEX [IX_PeticiosDns_RegistreId_Timestamp]
+                ON [PeticiosDns] ([RegistreId], [Timestamp]);
         END
         """);
 
@@ -1154,6 +1247,152 @@ app.MapDelete("/api/templates/{id:int}", async (int id, AppDbContext db, ClaimsP
     db.ActivityTemplates.Remove(t);
     await db.SaveChangesAsync();
     return Results.NoContent();
+}).RequireAuthorization();
+
+// ════════════════════════════════════════════════════════════════════════════
+// REGISTRE D'ACTIVITAT (LOG)
+// ════════════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════════════════
+// ENTORN EXAMEN
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── Sessions d'examen ─────────────────────────────────────────────────────────
+app.MapGet("/api/examen/sessions", async (IExamenService svc, ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var list = await svc.GetSessionsAsync(GetUserId(user), IsAdmin(user));
+    return Results.Ok(list);
+}).RequireAuthorization();
+
+app.MapPost("/api/examen/sessions", async (CreateSessioRequest req, IExamenService svc,
+    ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var (sessio, error) = await svc.CreateSessioAsync(req, GetUserId(user));
+    if (error is not null) return Results.Conflict(new { error });
+    return Results.Created($"/api/examen/sessions/{sessio!.Id}", sessio);
+}).RequireAuthorization();
+
+app.MapGet("/api/examen/sessions/{id:int}", async (int id, IExamenService svc,
+    ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var dashboard = await svc.GetDashboardAsync(id, GetUserId(user), IsAdmin(user));
+    return dashboard is null ? Results.NotFound() : Results.Ok(dashboard);
+}).RequireAuthorization();
+
+app.MapPut("/api/examen/sessions/{id:int}/tancar", async (int id, IExamenService svc,
+    ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var (ok, error) = await svc.TancarSessioAsync(id, GetUserId(user), IsAdmin(user));
+    return ok ? Results.NoContent() : Results.BadRequest(new { error });
+}).RequireAuthorization();
+
+app.MapPut("/api/examen/sessions/{id:int}/reobrir", async (int id, IExamenService svc,
+    ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var (ok, error) = await svc.ReobrirSessioAsync(id, GetUserId(user), IsAdmin(user));
+    return ok ? Results.NoContent() : Results.Conflict(new { error });
+}).RequireAuthorization();
+
+app.MapPut("/api/examen/sessions/{id:int}/missatge", async (int id, MissatgeRequest req,
+    IExamenService svc, ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var (ok, error) = await svc.SetMissatgeAsync(id, req.Text, GetUserId(user), IsAdmin(user));
+    return ok ? Results.NoContent() : Results.NotFound(new { error });
+}).RequireAuthorization();
+
+app.MapDelete("/api/examen/sessions/{id:int}/missatge", async (int id, IExamenService svc,
+    ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var (ok, error) = await svc.SetMissatgeAsync(id, null, GetUserId(user), IsAdmin(user));
+    return ok ? Results.NoContent() : Results.NotFound(new { error });
+}).RequireAuthorization();
+
+app.MapGet("/api/examen/sessions/{id:int}/exportar", async (int id, IExamenService svc,
+    ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var result = await svc.ExportarCsvAsync(id, GetUserId(user), IsAdmin(user));
+    if (result is null) return Results.NotFound();
+    var (bytes, fileName) = result.Value;
+    return Results.File(bytes, "text/csv; charset=utf-8", fileName);
+}).RequireAuthorization();
+
+app.MapGet("/api/examen/sessions/{id:int}/dashboard", async (int id, IExamenService svc,
+    ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var dashboard = await svc.GetDashboardAsync(id, GetUserId(user), IsAdmin(user));
+    return dashboard is null ? Results.NotFound() : Results.Ok(dashboard);
+}).RequireAuthorization();
+
+// ── Check-in alumne (sense autenticació — xarxa local tancada) ────────────────
+app.MapPost("/api/examen/checkin", async (CheckinRequest req, IExamenService svc) =>
+{
+    if (string.IsNullOrWhiteSpace(req.Email) || string.IsNullOrWhiteSpace(req.Mac))
+        return Results.BadRequest(new { error = "Email i MAC són obligatoris." });
+    var (resp, error) = await svc.CheckinAsync(req);
+    return error is not null
+        ? Results.NotFound(new { error })
+        : Results.Ok(resp);
+}).RequireRateLimiting("auth");
+
+// ── Events DHCP (cridat des del hook del sistema host) ────────────────────────
+app.MapPost("/api/examen/dhcp/event", async (DhcpEventRequest req, IExamenService svc) =>
+{
+    if (string.IsNullOrWhiteSpace(req.Mac) || string.IsNullOrWhiteSpace(req.Event))
+        return Results.BadRequest();
+    await svc.ProcessDhcpEventAsync(req);
+    return Results.Ok();
+});
+
+// ── Events DNS ────────────────────────────────────────────────────────────────
+app.MapPost("/api/examen/dns/event", async (DnsEventRequest req, IExamenService svc) =>
+{
+    if (string.IsNullOrWhiteSpace(req.Ip) || string.IsNullOrWhiteSpace(req.Domini))
+        return Results.BadRequest();
+    await svc.ProcessDnsEventAsync(req);
+    return Results.Ok();
+});
+
+// ── Importació alumnes ────────────────────────────────────────────────────────
+app.MapPost("/api/examen/importar-alumnes", async (HttpRequest httpReq,
+    IExamenService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    if (!httpReq.HasFormContentType) return Results.BadRequest(new { error = "Cal multipart/form-data." });
+    var form = await httpReq.ReadFormAsync();
+    var fitxer = form.Files.GetFile("fitxer");
+    if (fitxer is null) return Results.BadRequest(new { error = "Camp 'fitxer' no trobat." });
+
+    using var stream = fitxer.OpenReadStream();
+    var (result, error) = await svc.ImportarAlumnesAsync(stream, GetUserId(user), IsAdmin(user));
+    return error is not null
+        ? Results.BadRequest(new { error })
+        : Results.Ok(result);
+}).RequireAuthorization();
+
+app.MapPost("/api/examen/importar-fotos", async (HttpRequest httpReq,
+    IExamenService svc, IConfiguration config, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    if (!httpReq.HasFormContentType) return Results.BadRequest(new { error = "Cal multipart/form-data." });
+    var form = await httpReq.ReadFormAsync();
+    var zip  = form.Files.GetFile("zip");
+    if (zip is null) return Results.BadRequest(new { error = "Camp 'zip' no trobat." });
+
+    var wwwrootPath = config["Examen:WebWwwrootPath"] ?? "/app/wwwroot";
+    using var stream = zip.OpenReadStream();
+    var (result, error) = await svc.ImportarFotosAsync(stream, wwwrootPath);
+    return error is not null
+        ? Results.BadRequest(new { error })
+        : Results.Ok(result);
 }).RequireAuthorization();
 
 // ════════════════════════════════════════════════════════════════════════════

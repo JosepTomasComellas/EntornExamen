@@ -1,11 +1,12 @@
 namespace AutoCo.Shared;
 
-/// <summary>Versió de l'aplicació AutoCo. Actualitzar en cada canvi significatiu.</summary>
+/// <summary>Versió de l'aplicació. Actualitzar en cada canvi significatiu.</summary>
 public static class AppVersion
 {
-    public const string Current = "2.2.3";
-    public const string Name    = "AutoCo Avaluació";
+    public const string Current   = "1.0.0";
+    public const string Name      = "EntornExamen";
+    public const string AutoCoBase = "2.2.3";   // Versió base d'AutoCo de la qual és fork
 
     /// <summary>Descripció del canvi per al changelog intern.</summary>
-    public const string ChangeLog = "v2.2.3: fix participació mitjana capada al 100%";
+    public const string ChangeLog = "v1.0.0: implementació inicial de l'Entorn Examen";
 }

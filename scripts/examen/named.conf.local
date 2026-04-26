@@ -1,0 +1,13 @@
+logging {
+    channel dns_queries {
+        file "/var/log/named/queries.log" versions 3 size 5m;
+        severity dynamic;
+        print-time yes;
+    };
+    category queries { dns_queries; };
+};
+
+zone "examen.local" {
+    type master;
+    file "/etc/bind/db.examen.local";
+};

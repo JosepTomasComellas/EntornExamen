@@ -1,458 +1,288 @@
-# AutoCo — Sistema d'Avaluació entre Iguals · v2.2.3
+# EntornExamen + AutoCo · v1.0.0
 
-Aplicació web per gestionar **autoavaluació** i **coavaluació** d'alumnes en activitats de grup, pensada per a entorns educatius de cicles formatius i batxillerat.
+Sistema integrat en dues parts:
+- **EntornExamen** — control de presència en temps real durant exàmens sobre xarxa WiFi aïllada
+- **AutoCo** — autoavaluació i coavaluació entre iguals (base v2.2.3)
 
----
-
-## Funcionalitats
-
-### Professor / Administrador
-
-**Gestió de l'estructura docent**
-- Gestió de **classes**, **alumnes** i **mòduls** (UF/MP), amb edició inline
-- **Avatars** d'alumne amb inicials i color per número de llista
-- **Mou alumnes** entre classes (elimina participació anterior i reassigna)
-- **Exclusions per mòdul**: alumnes que no participen en un mòdul concret
-- Enviament de **credencials per correu** als alumnes (SMTP configurable)
-- **Codis QR** per a cada classe: genera un QR que porta directament a la pàgina de login de l'alumne
-
-**Gestió d'activitats**
-- Creació d'**activitats** d'avaluació per mòdul, amb obertura i tancament manual des del tauler
-- **Criteris personalitzats** per activitat (afegir, reordenar, eliminar) o usar els globals
-- **Plantilles d'activitat**: desa configuració (nom, descripció, criteris) i reutilitza-la en noves activitats
-- Configuració de **grups** per **arrossegar i deixar anar** (drag & drop)
-- **Edició del nom del grup inline** (botó llapis directament a la capçalera del grup)
-- Importació/exportació de grups per CSV
-- **Duplicació d'activitats** reutilitzant la configuració de grups
-- **Duplicació creuada** d'activitats a una altra classe i mòdul
-- **Indicador de participació** en temps real a cada targeta (Redis pub/sub, instantani)
-- **Recordatoris per correu** als alumnes que no han omplert l'avaluació
-- **Notificació automàtica al professor** quan el 100% de l'activitat s'ha completat
-- **Desfer eliminació** — finestra de 5 s per cancel·lar eliminació d'activitats i alumnes
-- **Registre d'activitat** per cada activitat: qui ha obert, tancat o enviat avaluació i quan
-- **Ordre de grups persistent** (▲▼) i criteris d'avaluació editables inline a la pàgina de grups
-
-**Resultats i informes**
-- Taula de **resultats** amb capçalera fixa, paginació (25 files), puntuació per criteri (Auto / Co) i notes globals acolorides per rang (verd/taronja/vermell)
-- **Filtres avançats**: per **alumne** (cerca per nom/cognoms), per grup i per rang de nota (alta ≥8 / mitjana 5–7.9 / baixa <5 / sense coavaluació)
-- **Notes del professor** per alumne: camp editable inline a la taula de resultats
-- **Gràfiques comparatives** per grup (Auto vs. Co, desglossament per criteri) amb Chart.js
-- **Informe PDF individual per alumne**: pàgina optimitzada per a impressió/PDF amb dades, notes globals, detall per criteri i comentaris
-- **Exportació CSV i Excel (.xlsx)** de resultats amb format i color per rang de nota
-
-**Perfil i autenticació**
-- **Pàgina de perfil** del professor: canvi de nom, cognoms i contrasenya des de la barra de navegació
-- **Restabliment de contrasenya per email**: OTP de 6 dígits vàlid 15 minuts (Redis)
-
-**Multi-idioma (i18n)**
-- **Selector d'idioma** a la barra de navegació: català (per defecte) i castellà
-- Infraestructura `IStringLocalizer` amb fitxers `.resx` — extensible a qualsevol cultura
-- Pàgines de login i navegació principal ja localitzades; resta de pàgines extensibles amb el mateix patró
-
-**Administració**
-- Gestió de **professors** i permisos d'administrador (exclusiu rol Admin)
-- **Còpies de seguretat**: exportació/importació JSON de tota la base de dades
-- **KPIs al tauler**: classes, mòduls, alumnes, activitats, obertes i grups
-- **Mode fosc** i **selector de tema de color** (6 opcions) amb preferències desades al navegador
-
-**PWA (Progressive Web App)**
-- **Instal·lable** com a aplicació nativa en escriptori, Android i iOS
-- **Caché d'assets estàtics** (CSS, JS) per càrrega més ràpida
-- **Pàgina offline** en català quan no hi ha connexió al servidor
-
-**Qualitat i fiabilitat**
-- **Notificació en temps real** de participació via Redis pub/sub (subscripció reactiva, sense polling)
-- **Tests unitaris** de `ResultsService`: 15 casos cobreixen càlcul de notes, caché, control d'accés i ordenació
-- **Validació CSV millorada**: format d'email, NumLlista duplicat, visualització completa d'errors inline
-
-### Alumne
-- Accés amb correu electrònic i contrasenya (o via codi QR de la classe)
-- Avaluació de tots els membres del grup (inclosa autoavaluació) per criteri
-- Puntuació amb **escala de 5 estrelles** mostrada com a lletra (E / D / C / B / A)
-- **Desar parcialment**: l'alumne pot guardar l'avanç sense haver completat tots els criteris
-- **Barra de progrés** d'avaluació completada en temps real (X/Y criteris puntuats)
+Salesians de Sarrià — Departament d'Informàtica · CFGS ASIX
 
 ---
 
-## Criteris d'avaluació globals (per defecte)
+## Entorn Examen
 
-| Clau | Descripció |
-|------|------------|
-| `probitat` | Probitat |
-| `autonomia` | Autonomia |
-| `responsabilitat` | Responsabilitat i Treball de qualitat |
-| `collaboracio` | Col·laboració i treball en equip |
-| `comunicacio` | Comunicació |
-
-Cada activitat pot sobreescriure aquests criteris amb la seva pròpia llista personalitzada.
-
-### Escala de puntuació
-
-| Estrelles | Lletra | Valor |
-|:---------:|:------:|:-----:|
-| ★☆☆☆☆ | E | 1 |
-| ★★☆☆☆ | D | 3.5 |
-| ★★★☆☆ | C | 5 |
-| ★★★★☆ | B | 7.5 |
-| ★★★★★ | A | 10 |
-
----
-
-## Arquitectura
+### Funcionament general
 
 ```
-AutoCo/
-├── api/          # API REST — ASP.NET Core 10 Minimal API
-│   ├── Data/     # EF Core DbContext, models i seed
-│   │   └── Models/   # Professor, Class, Student, Module, Activity,
-│   │                 # Group, Evaluation, ProfessorNote,
-│   │                 # ActivityTemplate, ActivityLog...
-│   ├── Services/ # Auth, Class, Activity, Evaluation, Results, Email, Backup
-│   ├── Migrations/
-│   └── Dockerfile
-├── web/          # Frontend — Blazor Server + MudBlazor
-│   ├── Components/
-│   │   ├── Pages/   # Alumne/, Professor/ (Dashboard, Resultats,
-│   │   │            #   Grafic, QrCodes, InformeAlumne...), Admin/, Auth/
-│   │   ├── Shared/  # ActivityCard, diàlegs reutilitzables
-│   │   └── Layout/  # MainLayout (tema de color, mode fosc)
-│   ├── Services/    # ApiClient, UserStateService
-│   ├── wwwroot/
-│   │   ├── css/site.css   # Estils globals, DnD, dark mode, print, informe PDF
-│   │   └── js/            # app.js (utilitats), charts.js (Chart.js interop)
-│   └── Dockerfile
-├── shared/       # DTOs + AppVersion compartits entre api i web
-├── nginx/        # Proxy invers amb SSL automàtic
-├── deploy/       # Scripts de desplegament (update.ps1, push-update.ps1)
-├── AutoCo.Tests/ # Tests unitaris xUnit (ResultsService, EF Core InMemory)
-└── docker-compose.yml
+[Alumnes] → WiFi "Entorn_Examen" (192.168.100.0/24, sense internet)
+                    │
+                    ▼
+     [VM Ubuntu 24.04 sobre Proxmox]
+          ├── isc-dhcp-server  → /var/lib/dhcp/dhcpd.leases
+          ├── BIND9 (DNS)      → /var/log/named/queries.log
+          └── Docker Compose
+                ├── nginx   (proxy SSL)
+                ├── api     (ASP.NET Core 10 Minimal API)
+                ├── web     (Blazor Server + MudBlazor)
+                ├── db      (SQL Server 2022 Express)
+                └── redis   (Redis 7 Alpine)
 ```
 
-### Serveis Docker
+L'alumne accedeix a **`https://192.168.100.1/examen`** i s'identifica amb el seu email corporatiu. La seva MAC s'associa al compte automàticament. A partir d'aquí, fa check-in cada 30 s i el professor veu l'estat de tota la classe en temps real.
 
-| Servei | Imatge | Port | Descripció |
-|--------|--------|------|------------|
-| `db` | SQL Server 2022 Express | intern | Base de dades principal |
-| `redis` | Redis 7 Alpine | intern | Caché de resultats + backplane SignalR |
-| `api` | ASP.NET Core 10 | intern | API REST + JWT |
-| `web` | ASP.NET Core 10 | intern | Blazor Server + MudBlazor |
-| `nginx` | nginx Alpine | 80 / 443 | Proxy SSL, WebSocket per Blazor |
+### Funcionalitats
 
-### Model de dades
+**Professor (`/professor/examen`)**
+- Inicia / tanca / reobre sessions d'examen per classe
+- Monitoratge en temps real: estat de cada alumne (connectat / sense check-in / desconnectat / no connectat)
+- Alertes de desconnexió amb **so** (Web Audio API, sense fitxers externs)
+- Alertes de peticions DNS externes sospitoses
+- Missatges push: apareixen com a diàleg obligatori a la pantalla de l'alumne
+- Exportació CSV de la sessió
+- Mode presentació (pantalla completa)
+
+**Alumne (`/examen`)**
+- Identificació per email corporatiu `@sarria.salesians.cat`
+- Check-in automàtic cada 30 s
+- Rebuda de missatges del professor (diàleg emergent obligatori)
+
+**Importació**
+- Alumnes: fitxer HTML/XLS d'Esfer@ (format del centre)
+- Fotos: ZIP de `{DNI}.jpg`
+
+### Arquitectura de dades (nous models)
 
 ```
-Professor ──< Module ──< Activity ──< Group ──< GroupMember (Student)
-              │               ├──< ActivityCriteria
-              │               ├──< Evaluation ──< EvaluationScore
-              │               ├──< ProfessorNote (per alumne)
-              │               └──< ActivityLog (registre d'accions)
-Class ────────┘
-  ├──< Student
-  └──< ModuleExclusion
-ActivityTemplate (per professor, criteris JSON)
+Student ──< AlumneMac           (un per dispositiu; MAC normalitzada lowercase)
+Class   ──< SessioExamen        (màx. 1 activa per classe)
+SessioExamen ──< RegistreConnexio ──< PeticioTdns
+Student      ──< RegistreConnexio   (null si MAC desconeguda)
 ```
+
+### Estats de connexió
+
+| Estat | Color | Condició |
+|-------|-------|---------|
+| `Connectat` | 🟢 Verd | Check-in < 30 s |
+| `SenseCheckin` | 🟡 Groc | Connectat però sense check-in recent |
+| `Desconnectat` | 🔴 Vermell | DHCP ha notificat desconnexió |
+| `NoConnectat` | ⚫ Gris | Precarregat però mai connectat |
+
+### Notificacions en temps real (Redis pub/sub)
+
+| Canal Redis | Receptor | Events |
+|------------|---------|--------|
+| `examen:sessio:{id}` | Professor | `AlumneConnectat`, `AlumneDesconnectat`, `NouCheckin`, `NovaPeticioExterna`, `MacDesconeguda`, `MissatgeActualitzat` |
+| `examen:alumne:{id}` | Alumne | `MissatgeProfessor`, `SessioTancadaGlobal` |
+
+### Endpoints de l'API (Entorn Examen)
+
+| Mètode | URL | Auth | Descripció |
+|--------|-----|------|-----------|
+| `GET` | `/api/examen/sessions` | JWT | Llista sessions |
+| `POST` | `/api/examen/sessions` | JWT | Crea sessió (409 si ja n'hi ha d'activa) |
+| `GET` | `/api/examen/sessions/{id}/dashboard` | JWT | Estat complet |
+| `PUT` | `/api/examen/sessions/{id}/tancar` | JWT | Tanca la sessió |
+| `PUT` | `/api/examen/sessions/{id}/reobrir` | JWT | Reobre la sessió |
+| `PUT` | `/api/examen/sessions/{id}/missatge` | JWT | Envia missatge push |
+| `DELETE` | `/api/examen/sessions/{id}/missatge` | JWT | Esborra el missatge |
+| `GET` | `/api/examen/sessions/{id}/exportar` | JWT | Exporta CSV |
+| `POST` | `/api/examen/checkin` | Cap | Check-in alumne |
+| `POST` | `/api/examen/dhcp/event` | Cap | Event DHCP (hook) |
+| `POST` | `/api/examen/dns/event` | Cap | Event DNS |
+| `POST` | `/api/examen/importar-alumnes` | JWT (admin) | Importa alumnes HTML/XLS |
+| `POST` | `/api/examen/importar-fotos` | JWT (admin) | Importa fotos ZIP |
 
 ---
 
-## Tecnologies
+## Instal·lació
 
-- **Backend:** C# / ASP.NET Core 10 · Entity Framework Core 10 · SQL Server 2022
-- **Frontend:** Blazor Server · [MudBlazor 8.6](https://mudblazor.com/) · Chart.js 4
-- **QR:** [Net.Codecrete.QrCodeGenerator](https://github.com/manuelbl/QrCodeGenerator) (SVG pur, sense deps)
-- **Autenticació:** JWT (professors) · email + contrasenya (alumnes) · `ProtectedLocalStorage`
-- **Caché:** Redis (`IDistributedCache`, TTL 5 min, invalidació automàtica)
-- **Temps real:** Redis pub/sub → `ParticipationNotificationService` → Blazor (reemplaça polling)
-- **Seguretat:** BCrypt (work factor 12) · JWT secret mínim 32 caràcters
-- **Email:** MailKit + SMTP configurable (credencials, recordatoris, notificació de compleció)
-- **PWA:** `manifest.json` + Service Worker (cache-first assets, pàgina offline)
-- **i18n:** `IStringLocalizer` + fitxers `.resx` (català per defecte, castellà)
-- **Tests:** xUnit + EF Core InMemory (15 tests unitaris de `ResultsService`)
-- **Desplegament:** Docker Compose · nginx (SSL/TLS auto-signat o certificat propi)
+### Requisits del servidor
 
----
+- VM Ubuntu 24.04 (recomanat sobre Proxmox)
+- Docker + Docker Compose v2
+- `isc-dhcp-server` per a la xarxa d'examen
+- `bind9` com a servidor DNS local
+- Interfície de xarxa dedicada (192.168.100.0/24)
 
-## Rols
-
-| Rol | Accés |
-|-----|-------|
-| **Admin** | Tot. Gestiona professors, veu totes les classes i activitats, còpies de seguretat |
-| **Professor** | Les seves pròpies classes, mòduls, activitats i resultats |
-| **Alumne** | Les activitats del seu grup. Pot avaluar mentre l'activitat és oberta |
-
----
-
-## Desplegament
-
-### Opció A — Entorn local (desenvolupament)
-
-**Requisits:** Docker Desktop
+### 1. Clonar el repositori
 
 ```bash
-git clone https://github.com/JosepTomasComellas/AutoCo.git
-cd AutoCo
-cp .env.example .env        # edita les variables si cal
-docker compose up --build
+git clone https://github.com/JosepTomasComellas/EntornExamen.git /docker/EntornExamen
+cd /docker/EntornExamen
 ```
 
-Accedeix a **https://localhost** (accepta l'avís del certificat auto-signat).
-
-### Opció B — Actualització directa des del servidor (recomanada)
-
-**Configuració inicial (una sola vegada):**
-```bash
-cd /docker
-git clone https://github.com/JosepTomasComellas/AutoCo.git AutoCo-git
-cp AutoCo/.env AutoCo-git/.env
-cp -r AutoCo/nginx/ssl AutoCo-git/nginx/ssl
-rm -rf AutoCo && mv AutoCo-git AutoCo
-```
-
-**A partir d'ara, per aplicar qualsevol actualització:**
-```bash
-bash /docker/AutoCo/deploy/server-update.sh
-```
-
-El script fa `git pull`, reconstrueix les imatges i mostra la versió desplegada.
-
-### Opció C — Actualització del servidor des de Windows
-
-```powershell
-# Genera el paquet de fitxers i copia al servidor
-.\deploy\update.ps1
-scp -r "deploy\autoco-update-YYYYMMDD" root@servidor:/docker/AutoCo-new
-```
+### 2. Configurar les variables d'entorn
 
 ```bash
-# Al servidor
-rsync -a --exclude='.env' --exclude='nginx/ssl' /docker/AutoCo-new/ /docker/AutoCo/
-bash /docker/AutoCo/update.sh
+cp .env.example .env
+nano .env
 ```
 
-### Comandes útils al servidor
+| Variable | Obligatori | Descripció |
+|----------|:----------:|-----------|
+| `MSSQL_SA_PASSWORD` | ✓ | Contrasenya SQL Server |
+| `JWT_SECRET` | ✓ | Secret JWT (≥ 32 caràcters) |
+| `ADMIN_EMAIL` | ✓ | Email administrador inicial |
+| `ADMIN_PASSWORD` | ✓ | Contrasenya administrador |
+| `ADMIN_NOM` | ✓ | Nom administrador |
+| `EXAMEN_DOMINI_EMAIL` | | Domini acceptat (per defecte: `sarria.salesians.cat`) |
+| `EXAMEN_CHECKIN_INTERVAL_SECONDS` | | Interval check-in (per defecte: `30`) |
+| `SMTP_HOST` | | Servidor SMTP (opcional) |
+
+### 3. Configurar el servidor DHCP
 
 ```bash
-bash /docker/AutoCo/deploy/server-update.sh  # Actualitzar des de GitHub
-docker compose logs -f           # Logs en temps real
-docker compose down              # Aturar (dades preservades)
-docker compose down -v           # Aturar i esborrar totes les dades
-bash /docker/AutoCo/backup.sh    # Backup manual de la BD
+sudo cp scripts/examen/dhcpd.conf /etc/dhcp/dhcpd.conf
+
+sudo cp scripts/examen/dhcp-hook.sh /etc/dhcp/dhcpd-enter-hooks.d/notifica-api
+sudo chmod +x /etc/dhcp/dhcpd-enter-hooks.d/notifica-api
+
+sudo systemctl restart isc-dhcp-server
+```
+
+### 4. Configurar BIND9
+
+```bash
+sudo cat scripts/examen/named.conf.local >> /etc/bind/named.conf.local
+sudo cp scripts/examen/db.examen.local /etc/bind/db.examen.local
+
+sudo mkdir -p /var/log/named
+sudo chown bind:bind /var/log/named
+
+sudo systemctl restart bind9
+```
+
+### 5. Construir i arrencar
+
+```bash
+docker compose up --build -d
+```
+
+### 6. Actualitzar (desplegaments posteriors)
+
+```bash
+cd /docker/EntornExamen
+git pull
+docker compose up --build -d
 ```
 
 ---
 
-## Configuració (.env)
-
-Copia `.env.example` a `.env` i ajusta els valors:
-
-| Variable | Descripció | Obligatori |
-|----------|------------|:----------:|
-| `MSSQL_SA_PASSWORD` | Contrasenya SQL Server (mínim 8 car., majúsc., número i símbol) | ✓ |
-| `JWT_SECRET` | Secret JWT (mínim 32 caràcters) | ✓ |
-| `JWT_EXPIRY_HOURS` | Durada del token en hores (per defecte: 8) | |
-| `ADMIN_EMAIL` | Correu de l'administrador inicial | ✓ |
-| `ADMIN_PASSWORD` | Contrasenya de l'administrador inicial | ✓ |
-| `ADMIN_NOM` | Nom de l'administrador | ✓ |
-| `ADMIN_COGNOMS` | Cognoms de l'administrador | |
-| `SMTP_HOST` | Servidor SMTP (p.ex. `smtp.gmail.com`) | |
-| `SMTP_PORT` | Port SMTP (p.ex. `587`) | |
-| `SMTP_USERNAME` | Usuari SMTP | |
-| `SMTP_PASSWORD` | Contrasenya SMTP (o app password) | |
-| `SMTP_FROM_ADDRESS` | Adreça remitent dels correus | |
-| `SMTP_FROM_NAME` | Nom remitent dels correus | |
-| `APP_WEB_URL` | URL pública (p.ex. `https://autoco.centre.cat`) — per als QR i links dels correus | |
-
-> SMTP és opcional. Si no es configura, les funcions d'email queden desactivades però l'aplicació funciona amb normalitat.
-
-### SSL
+## SSL
 
 - **Sense certificat:** nginx genera automàticament un certificat auto-signat vàlid 10 anys.
 - **Amb certificat propi:** col·loca `server.crt` i `server.key` a `nginx/ssl/` abans d'arrencar.
 
 ---
 
-## Endpoints principals de l'API
+## Estructura del projecte
 
 ```
-POST /api/auth/professor                              # Login professor/admin
-POST /api/auth/student                                # Login alumne
+EntornExamen/
+├── api/
+│   ├── Data/
+│   │   ├── AppDbContext.cs
+│   │   └── Models/
+│   │       ├── AlumneMac.cs          # Nou: MAC ↔ Alumne
+│   │       ├── SessioExamen.cs       # Nou: sessió d'examen
+│   │       ├── RegistreConnexio.cs   # Nou: registre connexió + EstatConnexio
+│   │       └── PeticioTdns.cs        # Nou: peticions DNS
+│   ├── Hubs/
+│   │   └── ExamenHub.cs              # Nou: publicador Redis
+│   ├── Services/
+│   │   ├── ExamenService.cs          # Nou: lògica de negoci
+│   │   ├── DhcpMonitorService.cs     # Nou: monitor dhcpd.leases
+│   │   └── DnsMonitorService.cs      # Nou: monitor dns-queries.log
+│   └── Program.cs
+├── web/
+│   ├── Services/
+│   │   ├── ExamenNotificationService.cs  # Nou: bus intern notificacions
+│   │   └── ExamenRedisSubscriber.cs      # Nou: subscriptor Redis
+│   └── Components/Pages/
+│       ├── Examen/Portal.razor           # Nou: /examen (alumne)
+│       └── Professor/Examen.razor        # Nou: /professor/examen
+├── shared/Dtos.cs                    # + DTOs Entorn Examen
+├── scripts/examen/                   # Configuració DHCP + DNS
+│   ├── dhcp-hook.sh
+│   ├── dhcpd.conf
+│   ├── named.conf.local
+│   └── db.examen.local
+├── AutoCo.Tests/
+│   └── ExamenServiceTests.cs         # Nou: 10 tests ExamenService
+└── docker-compose.yml
+```
 
-GET/POST/PUT/DELETE /api/professors                   # Gestió professors (admin)
-GET/POST/PUT/DELETE /api/classes                      # Gestió classes
-GET/POST/PUT/DELETE /api/classes/{id}/students        # Gestió alumnes
-POST /api/classes/{id}/students/bulk                  # Importació massiva CSV
-POST /api/classes/{id}/students/{sid}/reset-password  # Reset contrasenya
-POST /api/classes/{id}/students/{sid}/send-password   # Enviar credencials per correu
-POST /api/classes/{id}/students/send-all-passwords    # Enviar credencials a tots
-POST /api/classes/{id}/students/{sid}/move            # Moure alumne a una altra classe
-GET/POST/PUT/DELETE /api/classes/{id}/modules         # Gestió mòduls
-GET/POST/DELETE    /api/modules/{id}/exclusions       # Exclusions per mòdul
+---
 
-GET/POST/PUT/DELETE /api/activities                   # Gestió activitats
-POST /api/activities/{id}/toggle                      # Obrir/tancar activitat
-POST /api/activities/{id}/duplicate                   # Duplicar (mateixa classe)
-POST /api/activities/{id}/duplicate-cross             # Duplicar a una altra classe
-GET  /api/activities/{id}/participation               # Estat de participació
-POST /api/activities/{id}/remind                      # Enviar recordatoris
-GET  /api/activities/{id}/criteria                    # Obtenir criteris
-PUT  /api/activities/{id}/criteria                    # Desar criteris personalitzats
-GET  /api/activities/{id}/groups/export               # Exportar grups (CSV)
-POST /api/activities/{id}/groups/import               # Importar grups (CSV)
-GET/POST/DELETE /api/activities/{id}/groups           # Gestió grups
-PUT /api/activities/{id}/groups/{gid}                 # Renomenar grup
-POST/DELETE /api/activities/{id}/groups/{gid}/members # Membres de grup
-GET  /api/activities/{id}/log                         # Registre d'activitat
+## Tests
 
-GET  /api/notes/{activityId}                          # Notes del professor per activitat
-GET  /api/notes/{activityId}/{studentId}              # Nota d'un alumne concret
-PUT  /api/notes/{activityId}/{studentId}              # Desar nota
+```bash
+dotnet test AutoCo.Tests/
+# Passed: 26 — 16 de ResultsService + 10 de ExamenService
+```
 
-GET  /api/templates                                   # Llistar plantilles del professor
-POST /api/templates                                   # Crear plantilla
-DELETE /api/templates/{id}                            # Eliminar plantilla
+---
 
-GET  /api/evaluations/{activityId}                    # Formulari d'avaluació (alumne)
-POST /api/evaluations/{activityId}                    # Guardar avaluació
-GET  /api/student/activities                          # Dashboard alumne
+## AutoCo (base)
 
-GET  /api/results/{activityId}                        # Resultats (professor)
-GET  /api/results/{activityId}/chart                  # Dades gràfica
-GET  /api/results/{activityId}/csv                    # Exportar CSV
+### Funcionalitats
 
-GET/POST /api/admin/backup/files                      # Backups al servidor
-GET/DELETE /api/admin/backup/files/{name}             # Descarregar/eliminar backup
-POST /api/admin/backup/files/{name}/restore           # Restaurar backup
-GET  /api/admin/backup/export                         # Exportar backup JSON complet
-POST /api/admin/backup/import                         # Importar backup JSON
+**Professor / Admin**
+- Gestió de classes, alumnes i mòduls amb edició inline
+- Activitats d'avaluació amb criteris personalitzats i plantilles
+- Grups per drag & drop, importació/exportació CSV, duplicació creuada
+- Resultats amb filtres avançats, gràfiques, exportació CSV/Excel, informes PDF
+- Indicador de participació en temps real (Redis pub/sub)
+- Recordatoris per correu, notes per alumne, registre d'activitat
+- Codis QR per classe, mode fosc, selector de tema de color
+- Còpies de seguretat JSON, estadístiques d'ús (Admin)
 
-GET  /api/health                                      # Estat DB + Redis
-GET  /api/criteria                                    # Llista de criteris globals
+**Alumne**
+- Avaluació de tots els membres del grup (inclosa autoavaluació)
+- Escala E/D/C/B/A (1 / 3.5 / 5 / 7.5 / 10)
+- Desat parcial i barra de progrés
+
+### Criteris globals per defecte
+
+| Clau | Descripció |
+|------|-----------|
+| `probitat` | Probitat |
+| `autonomia` | Autonomia |
+| `responsabilitat` | Responsabilitat i Treball de qualitat |
+| `collaboracio` | Col·laboració i treball en equip |
+| `comunicacio` | Comunicació |
+
+### Model de dades AutoCo
+
+```
+Professor ──< Module ──< Activity ──< Group ──< GroupMember (Student)
+              │               ├──< ActivityCriteria
+              │               ├──< Evaluation ──< EvaluationScore
+              │               ├──< ProfessorNote
+              │               └──< ActivityLog
+Class ────────┘
+  ├──< Student ──< AlumneMac         (Entorn Examen)
+  └──< ModuleExclusion
+ActivityTemplate
 ```
 
 ---
 
 ## Changelog
 
-### v2.2.3
-- **Fix estadístiques**: participació mitjana capada al 100% — valors superiors indicaven alumnes que van avaluar i després van ser moguts o eliminats del grup
-
-### v2.2.2
-- **Estadístiques: reiniciar registre d'accessos** — botó (icona paperera) a la capçalera de la pàgina d'estadístiques; demana confirmació i esborra tots els registres de `ProfessorLogins`; nou endpoint `DELETE /api/admin/stats/logins`
-
-### v2.2.1
-- **Fix**: migració formal `AddProfessorLogins` per resoldre `PendingModelChangesWarning` d'EF Core 10
-- **Fix**: query `GroupBy` a `/api/admin/stats` ara usa tipus anònim per evitar error de traducció SQL
-
-### v2.2.0
-- **Estadístiques d'ús (admin)** — nova pàgina `/admin/estadistiques` accessible només per administradors: KPIs globals (accessos 30d, professors actius, activitats creades), taula per professor (accessos, activitats, participació mitjana, darrer accés amb codi de color) i gràfica de tendència mensual (últims 6 mesos)
-- **Registre de logins** — cada accés de professor es desa a la taula `ProfessorLogins` per alimentar les estadístiques; sense impacte en rendiment ni en privacitat (dades internes)
-- **Nou endpoint** `GET /api/admin/stats` — retorna estadístiques agregades per professor i tendència mensual
-
-### v2.1.3
-- **Peu de pàgina simplificat** — «AutoCo Avaluació © any» → «AutoCo © any» arreu (footer, informes PDF) per evitar salt de línia en mòbil
-
-### v2.1.2
-- **Correcció login: missatge d'error** — les credencials incorrectes ja mostren el missatge d'error en comptes de retornar silenciosament a la selecció de rol; nou `PostLoginAsync` separa la lògica de 401-credencials de 401-sessió expirada
-- **Barra de progrés sticky** — `height: 100vh; overflow: hidden` al `.mud-layout` i `overflow-y: auto; min-height: 0` al `.mud-main-content` perquè `position: sticky` funcioni dins del contenidor de scroll de MudBlazor
-- **`server-update.sh`: mostra versions** — el script de desplegament ara mostra la versió actual desplegada, la versió nova al repositori i la llista de commits nous abans d'actualitzar
-
-### v2.1.1
-- **Correcció login: canvi de rol** — `OnInitialized` de les pàgines de login ja no redirigeix qualsevol usuari autenticat, sinó únicament l'usuari del rol corresponent; permet canviar de rol per fer proves sense quedar-se atrapat
-
-### v2.1.0
-- **Grups: edició inline del nom** — botó llapis a la capçalera de cada grup, camp inline amb confirm/cancel; nou endpoint `PUT /api/activities/{id}/groups/{gid}`
-- **Valoració parcial** — l'alumne pot desar l'avaluació sense tenir tots els criteris omplerts; es mostra un avís però no es bloqueja
-- **Resultats: filtre per alumne** — camp de cerca per nom/cognoms a la secció de filtres avançats
-- **Correcció gràfics** — Chart.js carregat des d'`App.razor` (no `<HeadContent>`) per garantir que la llibreria estigui disponible en qualsevol navegació
-- **Correcció indicador de participació** — `GetParticipationAsync` ara filtra per `IsSelf = true`, consistent amb el senyal en temps real de Redis; ja no compta avaluacions parcials com a completes
-- **Barra de progrés sticky** — `overflow-y: auto` al `.mud-main-content` perquè `position: sticky` funcioni correctament dins del contenidor de scroll de MudBlazor
-- **Scroll a la llista de grups** — la columna d'alumnes sense assignar té `max-height: 400px` i scroll intern; el botó de llançar-hi és sempre visible
-- **Activitats tancades** — fons vermell clarament visible en mode clar (`#fecaca`) i fosc (`#450a0a`) via classe CSS
-- **Footer** — «Departament» abreujat a «Dept.» arreu (footer, informes PDF)
-
-### v2.0.0
-- **Migració a .NET 10**: tots els projectes (`api`, `web`, `shared`, `AutoCo.Tests`) actualitzats a `net10.0`; imatges Docker `aspnet:10.0` / `sdk:10.0`; paquets Microsoft `10.0.*`
-- **UI alumne**: llegenda de puntuació eliminada del formulari d'avaluació — la correspondència estreles ↔ lletra ja es mostra inline a cada criteri
-- **UI professor**: botons de les targetes d'activitat agrupats en un desplegable — les quatre primeres accions (Resultats, Grups, Editar, Gràfica) resten visibles directament
-- **PWA**: `theme_color` del manifest i meta tag corregit (`#1976d2` → `#1e293b`); colors de la pàgina offline alineats amb el tema de l'aplicació
-- **Qualitat**: 0 warnings de compilació — CS8604 (`NomComplet` nullable) i EF1002 (pragma) resolts
-
-### v1.6.8
-- **i18n completa**: tota la UI traduïda al català i castellà; `DictionaryLocalizer` cobreix totes les cadenes de professors, alumnes i administrador
-- **Bugfix**: taules `ActivityCriteria`, `ActivityLogs`, `ProfessorNotes`, `ActivityTemplates` no es creaven en alguns entorns — afegida migració explícita
-- **Bugfix**: botons d'`ActivityCard` feien wrap en pantalles petites — afegit `flex-wrap:wrap`
-
-### v1.6.6
-- **DictionaryLocalizer estàtic**: bypass del `ResourceManager` per evitar problemes de resolució de recursos embeguts a Docker; totes les traduccions ara en diccionaris C# compilats
-
-### v1.6.5
-- **Bugfix i18n**: selector d'idioma no feia res en fer clic — `InvokeVoidAsync` al `OnClick` de `MudMenuItem` retornava `ValueTask` sense ser awaited i l'excepció era silenciosa; canviat a `async () => await JS.InvokeVoidAsync(...)`
-- **Bugfix i18n**: recursos de localització no trobats — registre explícit de `IStringLocalizer<SharedResources>` via `factory.Create("AutoCo.Web.Resources.SharedResources", "AutoCo.Web")` que apunta directament al recurs embedded correcte; afegit using `Microsoft.Extensions.Localization`
-
-### v1.6.4
-- **Bugfix i18n crític**: les claus de traducció es mostraven literalment (p.ex. `Lang_Catalan`) perquè `ResourceManagerStringLocalizerFactory` no podia calcular el nom del recurs embedded sense `[RootNamespace]`; afegit `[assembly: RootNamespaceAttribute("AutoCo.Web")]` a `Program.cs`
-- **Bugfix i18n Blazor Server**: `RequestLocalizationMiddleware` fixava la cultura al thread HTTP però els threads del circuit Blazor no l'heretaven; `App.razor` ara llegeix la cultura del `HttpContext` via `IRequestCultureFeature` i la propaga via `CultureInfo.DefaultThreadCurrentCulture/UICulture`
-- **Redis**: el warning `Memory overcommit must be enabled` és una advertència del host Linux — veure les instruccions de configuració al servidor
-
-### v1.6.3
-- **Rendiment crític**: `BackupService.ImportAsync` passava de N+1 `SaveChangesAsync` (centenars de crides per backup gran) a exactament 10 crides independentment del volum de dades
-- **Seguretat**: codi OTP de restabliment de contrasenya usat `new Random()` (predictible) — substituït per `RandomNumberGenerator.GetInt32()` (criptogràficament segur)
-- **Robustesa**: `ModuleService.CreateAsync` usava l'operador `!` null-forgiving sense validació — ara llança `InvalidOperationException` si el professor no existeix
-- **Logging**: `catch {}` al log de toggle d'activitat substituït per `logger.LogWarning` amb context
-- **Robustesa**: `GetUserId` usava `int.Parse` (pot llançar `FormatException`) — substituït per `int.TryParse` amb fallback segur
-
-### v1.6.2
-- **Seguretat crítica**: IDOR a `CreateGroupAsync`, `DeleteGroupAsync`, `AddMemberAsync`, `RemoveMemberAsync` — qualsevol professor podia gestionar grups i membres d'activitats alienes; tots ara validen propietat de l'activitat
-- **Robustesa**: `ReorderGroupsAsync` usa `Dictionary.TryGetValue` en lloc de `.First()` per evitar `InvalidOperationException` en condicions de carrera
-- **Rendiment**: refactorització de `ImportGroupsAsync` en 3 fases (parse → crear grups → crear membres) eliminant tots els `SaveChangesAsync` dins del loop; es garanteix coherència i s'eviten duplicats en importacions simultànies
-- **Logging**: `EvaluationService` ara registra warns detallats en lloc de `catch { }` silent als `Task.Run` (notificació Redis, log d'activitat, notificació de compleció)
-- **Rendiment**: `ProfessorService.SendAllCredentialsAsync` N+1 corregit (un sol `SaveChangesAsync` per a tots els professors)
-- **Seguretat**: `/api/health` ara requereix autenticació per evitar information disclosure
-- **DoS**: `PUT /api/activities/{id}/criteria` limitat a 50 criteris màxim per activitat
-- **Seguretat**: `BackupService.ImportAsync` retorna missatge genèric en errors (sense detalls interns)
-
-### v1.6.1
-- **Seguretat**: IDOR a `GetGroupsAsync` i `ReorderGroupsAsync` — qualsevol professor autenticat podia llegir/modificar grups d'activitats alienes; afegida validació de propietat
-- **Seguretat**: `ReorderGroupsAsync` ara ignora IDs de grups que no pertanyen a l'activitat
-- **Rendiment**: `SendAllPasswordsAsync` tenia N+1 `SaveChangesAsync` dins el bucle — ara desa tots els hashes d'un cop
-- **Robustesa**: `ImportGroupsAsync` afegit límit de 5 MB i 5.000 línies per prevenir DoS
-
-### v1.6.0
-- **PWA**: `manifest.json`, service worker (cache-first d'assets, pàgina offline)
-- **Temps real**: Redis pub/sub substitueix el polling de 30 s a l'indicador de participació
-- **Validació CSV**: regex email, NumLlista duplicat, llista d'errors inline completa
-- **Tests unitaris**: 15 casos xUnit per a `ResultsService` (EF Core InMemory)
-- **i18n**: `IStringLocalizer` + fitxers `.resx` (ca/es), selector d'idioma a la navbar
-- **Bugfix**: caché de resultats no s'invalidava en canviar criteris, obrir/tancar o editar activitats
-- **Bugfix**: `ActivityCard` no es subscrivia a temps real si l'activitat s'obria post-render
-
-### v1.5.0
-- Perfil professor (nom, cognoms, contrasenya) des de la barra de navegació
-- Restabliment de contrasenya per email (OTP 6 dígits, Redis, 15 min)
-- Exportació Excel (.xlsx) amb color per rang de nota
-- Criteris d'avaluació editables inline a la pàgina de grups
-- Ordre de grups persistent (▲▼)
-- Paginació de la taula de resultats (25 files)
-- Seguretat: comprovació de propietat en endpoints de notes i log
-
-### v1.4.0
-- Notes del professor per alumne (editables inline)
-- Plantilles d'activitat (desa i reutilitza configuració + criteris)
-- Gràfiques comparatives Auto vs. Co per grup i per criteri (Chart.js)
-- Codis QR per classe (SVG, imprimibles)
-- Informe PDF individual per alumne
-- Duplicació creuada d'activitats entre classes
-- Registre d'activitat (qui ha obert, tancat, avaluat i quan)
-
-### v1.3.0 i anteriors
-- Gestió de classes, alumnes, mòduls i activitats
-- Grups per drag & drop, importació/exportació CSV
-- Autoavaluació i coavaluació per escala d'estrelles
-- Resultats amb filtres, exportació CSV
-- Mode fosc, selector de tema de color
-- Còpies de seguretat JSON
+### v1.0.0 (2026-04-26)
+- Implementació inicial de l'Entorn Examen sobre la base AutoCo v2.2.3
+- Nous models: `AlumneMac`, `SessioExamen`, `RegistreConnexio`, `PeticioTdns`
+- Portal alumne `/examen` i plafó professor `/professor/examen`
+- Serveis background: `DhcpMonitorService`, `DnsMonitorService`
+- Notificacions Redis pub/sub en temps real
+- Alertes sonores via Web Audio API
+- Importació d'alumnes (HTML/XLS) i fotos (ZIP per DNI)
+- Scripts de configuració DHCP i BIND9
+- 10 tests unitaris nous (26 en total)
 
 ---
 
 ## Llicència
 
-Projecte de codi obert per a ús educatiu — Salesians de Sarrià, Departament d'Informàtica.
+Ús intern — Salesians de Sarrià, Departament d'Informàtica.
