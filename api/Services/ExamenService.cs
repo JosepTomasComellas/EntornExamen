@@ -23,7 +23,8 @@ public interface IExamenService
     Task ProcessDhcpEventAsync(DhcpEventRequest req);
     Task ProcessDnsEventAsync(DnsEventRequest req);
     Task<(ImportacioAlumnesResult Result, string? Error)> ImportarAlumnesAsync(Stream htmlStream, int professorId, bool isAdmin);
-    Task<(ImportacioAlumnesResult Result, string? Error)> ImportarAlumnesXlsAsync(Stream xlsStream, int professorId, bool isAdmin);
+    Task<(ImportacioAlumnesResult Result, string? Error)> ImportarAlumnesXlsAsync(Stream xlsStream, int classId, bool isAdmin);
+    Task<bool> UploadStudentFotoAsync(int studentId, Stream foto, string wwwrootPath);
     Task<(ImportacioFotosResult Result, string? Error)> ImportarFotosAsync(Stream zipStream, string wwwrootPath);
     Task<List<AlumneMacDto>> GetMacsAsync(bool isAdmin);
     Task<bool> DeleteMacAsync(int id, bool isAdmin);
@@ -619,9 +620,12 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
     // ─── Importació alumnes (XLS natiu EPSS) ─────────────────────────────────
 
     public async Task<(ImportacioAlumnesResult Result, string? Error)> ImportarAlumnesXlsAsync(
-        Stream xlsStream, int professorId, bool isAdmin)
+        Stream xlsStream, int classId, bool isAdmin)
     {
         if (!isAdmin) return (new ImportacioAlumnesResult(0, 0, 0, []), "Sense permisos.");
+
+        var classe = await db.Classes.FindAsync(classId);
+        if (classe is null) return (new ImportacioAlumnesResult(0, 0, 0, []), "Classe no trobada.");
 
         System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
 
@@ -659,25 +663,23 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                     ["Format no reconegut. Cal XLS/XLSX o HTML exportat d'EPSS."]), null);
         }
 
-        if (files.Count < 4) return (new ImportacioAlumnesResult(0, 0, 0, ["Format incorrecte: menys de 4 files."]), null);
-
-        // Fila 0: nom de classe, Fila 1: buida, Fila 2: capçaleres, Fila 3+: dades
-        var nomClasse = files[0].Count > 0 ? files[0][0] : "";
-        if (string.IsNullOrWhiteSpace(nomClasse))
-            return (new ImportacioAlumnesResult(0, 0, 0, ["No s'ha pogut detectar el nom de la classe."]), null);
-
-        var classe = await db.Classes.FirstOrDefaultAsync(c => c.Name == nomClasse);
-        if (classe is null)
+        // Detecta si el fitxer té capçalera (fila 0 = nom classe, 1 = buida, 2 = headers, 3+ = dades)
+        // o bé comença directament per les capçaleres (fila 0 = headers, 1+ = dades)
+        int dataStart = 3;
+        if (files.Count > 0 && files[0].Count > 0)
         {
-            classe = new Class { Name = nomClasse };
-            db.Classes.Add(classe);
-            await db.SaveChangesAsync();
+            var primeraCel = files[0][0];
+            if (int.TryParse(primeraCel, out _) || primeraCel.Equals("Num.", StringComparison.OrdinalIgnoreCase))
+                dataStart = 1; // comença per la fila de dades / capçaleres → salt d'1
         }
+
+        if (files.Count <= dataStart)
+            return (new ImportacioAlumnesResult(0, 0, 0, ["Fitxer sense dades d'alumnes."]), null);
 
         var importats = 0; var actualitzats = 0; var saltats = 0;
         var errors = new List<string>();
 
-        for (int r = 3; r < files.Count; r++)
+        for (int r = dataStart; r < files.Count; r++)
         {
             var row = files[r];
             if (row.Count < 6) { saltats++; continue; }
@@ -749,6 +751,18 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             if (cols.Count > 0) rows.Add(cols);
         }
         return rows;
+    }
+
+    // ─── Foto manual per alumne ───────────────────────────────────────────────
+
+    public async Task<bool> UploadStudentFotoAsync(int studentId, Stream foto, string wwwrootPath)
+    {
+        var destDir = Path.Combine(wwwrootPath, "fotos", "alumnes");
+        Directory.CreateDirectory(destDir);
+        var dest = Path.Combine(destDir, $"{studentId}.jpg");
+        using var fs = File.Create(dest);
+        await foto.CopyToAsync(fs);
+        return true;
     }
 
     // ─── Importació fotos ─────────────────────────────────────────────────────

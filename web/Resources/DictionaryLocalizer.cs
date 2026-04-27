@@ -771,6 +771,9 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
         ["Epss_NoTrobades"]         = "Sense alumne (DNI no trobat):",
         ["Epss_Errors"]             = "Errors:",
         ["Epss_CapFitxer"]          = "Cap fitxer seleccionat",
+        ["Epss_FotoOk"]             = "Foto actualitzada",
+        ["Epss_FotoError"]          = "Error en carregar la foto",
+        ["Epss_FotoBtn"]            = "Canviar foto",
     };
 
     // ── Castellà ─────────────────────────────────────────────────────────────
@@ -1535,6 +1538,9 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
         ["Epss_NoTrobades"]         = "Sin alumno (DNI no encontrado):",
         ["Epss_Errors"]             = "Errores:",
         ["Epss_CapFitxer"]          = "Ningún fichero seleccionado",
+        ["Epss_FotoOk"]             = "Foto actualizada",
+        ["Epss_FotoError"]          = "Error al cargar la foto",
+        ["Epss_FotoBtn"]            = "Cambiar foto",
     };
 
     // ── Implementació IStringLocalizer ────────────────────────────────────────

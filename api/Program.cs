@@ -561,6 +561,22 @@ app.MapPost("/api/classes/{classId:int}/students/{studentId:int}/move", async (
     return s is null ? Results.NotFound() : Results.Ok(s);
 }).RequireAuthorization();
 
+app.MapPost("/api/classes/{classId:int}/students/{studentId:int}/foto", async (
+    int classId, int studentId, HttpRequest httpReq,
+    AppDbContext db, IExamenService svc, IWebHostEnvironment env, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    if (!httpReq.HasFormContentType) return Results.BadRequest(new { error = "Cal multipart/form-data." });
+    var exists = await db.Students.AnyAsync(s => s.Id == studentId && s.ClassId == classId);
+    if (!exists) return Results.NotFound();
+    var form = await httpReq.ReadFormAsync();
+    var file = form.Files.GetFile("foto");
+    if (file is null) return Results.BadRequest(new { error = "Camp 'foto' no trobat." });
+    using var stream = file.OpenReadStream();
+    await svc.UploadStudentFotoAsync(studentId, stream, env.WebRootPath);
+    return Results.Ok(new { url = $"/fotos/alumnes/{studentId}.jpg" });
+}).RequireAuthorization();
+
 // ════════════════════════════════════════════════════════════════════════════
 // MÒDULS
 // ════════════════════════════════════════════════════════════════════════════
@@ -1378,18 +1394,20 @@ app.MapPost("/api/examen/importar-alumnes", async (HttpRequest httpReq,
         : Results.Ok(result);
 }).RequireAuthorization();
 
-// ── Importació alumnes XLS (format EPSS natiu) ───────────────────────────────
+// ── Importació alumnes XLS (format EPSS natiu, per classe) ───────────────────
 app.MapPost("/api/examen/importar-alumnes-xls", async (HttpRequest httpReq,
+    [Microsoft.AspNetCore.Mvc.FromQuery] int classId,
     IExamenService svc, ClaimsPrincipal user) =>
 {
     if (!IsAdmin(user)) return Results.Forbid();
+    if (classId <= 0) return Results.BadRequest(new { error = "Cal indicar classId." });
     if (!httpReq.HasFormContentType) return Results.BadRequest(new { error = "Cal multipart/form-data." });
     var form = await httpReq.ReadFormAsync();
     var fitxer = form.Files.GetFile("fitxer");
     if (fitxer is null) return Results.BadRequest(new { error = "Camp 'fitxer' no trobat." });
 
     using var stream = fitxer.OpenReadStream();
-    var (result, error) = await svc.ImportarAlumnesXlsAsync(stream, GetUserId(user), IsAdmin(user));
+    var (result, error) = await svc.ImportarAlumnesXlsAsync(stream, classId, IsAdmin(user));
     return error is not null
         ? Results.BadRequest(new { error })
         : Results.Ok(result);

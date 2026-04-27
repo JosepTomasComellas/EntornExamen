@@ -156,6 +156,107 @@
                     }
                 </MudPaper>
             }
+
+            <!-- ── Importació EPSS ─────────────────────────────────────────── -->
+            <MudCard Elevation="2" Class="mt-4">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Tertiary" Variant="Variant.Filled" Size="Size.Small">
+                            <MudIcon Icon="@Icons.Material.Filled.School" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">@Loc["Epss_Title"]</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent Class="pb-0">
+
+                    <!-- XLS alumnes -->
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:600">@Loc["Epss_SubtitleAlumnes"]</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">@Loc["Epss_AlumnesDesc"]</MudText>
+                    <MudFileUpload T="IBrowserFile" Accept=".xls,.xlsx" FilesChanged="OnXlsSeleccionat">
+                        <ActivatorContent>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Tertiary" FullWidth="true" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.AttachFile">
+                                @(_xlsFitxer is null ? Loc["Epss_SeleccionaFitxer"].Value : _xlsFitxer.Name)
+                            </MudButton>
+                        </ActivatorContent>
+                    </MudFileUpload>
+                    @if (_resultXls is not null)
+                    {
+                        <MudAlert Severity="Severity.Success" Dense="true" Class="mt-2">
+                            @Loc["Epss_ResultatAlumnes", _resultXls.Importats, _resultXls.Actualitzats, _resultXls.Saltats]
+                        </MudAlert>
+                        @if (_resultXls.Errors.Count > 0)
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-1">
+                                <ul style="margin:0 0 0 16px;padding:0">
+                                    @foreach (var e in _resultXls.Errors)
+                                    { <li><MudText Typo="Typo.caption">@e</MudText></li> }
+                                </ul>
+                            </MudAlert>
+                        }
+                    }
+                    @if (_errorXls is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_errorXls</MudAlert>
+                    }
+
+                    <MudDivider Class="my-3" />
+
+                    <!-- ZIP fotos -->
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:600">@Loc["Epss_SubtitleFotos"]</MudText>
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                        <strong>@Loc["Epss_ComObtenir"]</strong>
+                        <ol style="margin:4px 0 0 16px;padding:0">
+                            <li><MudText Typo="Typo.caption">@Loc["Epss_Pas1"]</MudText></li>
+                            <li><MudText Typo="Typo.caption">@Loc["Epss_Pas2"]</MudText></li>
+                            <li><MudText Typo="Typo.caption">@Loc["Epss_Pas3"]</MudText></li>
+                        </ol>
+                    </MudAlert>
+                    <MudFileUpload T="IBrowserFile" Accept=".zip" FilesChanged="OnZipSeleccionat">
+                        <ActivatorContent>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Tertiary" FullWidth="true" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.FolderZip">
+                                @(_zipFitxer is null ? Loc["Epss_SeleccionaZip"].Value : _zipFitxer.Name)
+                            </MudButton>
+                        </ActivatorContent>
+                    </MudFileUpload>
+                    @if (_resultZip is not null)
+                    {
+                        <MudAlert Severity="Severity.Success" Dense="true" Class="mt-2">
+                            @Loc["Epss_ResultatFotos", _resultZip.Importades]
+                        </MudAlert>
+                        @if (_resultZip.NoTrobades.Count > 0)
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-1">
+                                <strong>@Loc["Epss_NoTrobades"]</strong>
+                                <MudText Typo="Typo.caption">@string.Join(", ", _resultZip.NoTrobades)</MudText>
+                            </MudAlert>
+                        }
+                    }
+                    @if (_errorZip is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_errorZip</MudAlert>
+                    }
+                </MudCardContent>
+                <MudCardActions Class="px-4 pb-4 gap-2 flex-wrap">
+                    <MudButton Variant="Variant.Filled" Color="Color.Tertiary" Size="Size.Small"
+                               OnClick="ImportarXlsAsync"
+                               Disabled="@(_xlsFitxer is null || _carregantXls)"
+                               StartIcon="@Icons.Material.Filled.TableChart">
+                        @if (_carregantXls) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
+                        @Loc["Epss_SubtitleAlumnes"]
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Tertiary" Size="Size.Small"
+                               OnClick="ImportarZipAsync"
+                               Disabled="@(_zipFitxer is null || _carregantZip)"
+                               StartIcon="@Icons.Material.Filled.PhotoLibrary">
+                        @if (_carregantZip) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
+                        @Loc["Epss_SubtitleFotos"]
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
         </MudItem>
     }
 
@@ -243,9 +344,16 @@
                 <TemplateColumn Title="@Loc["ClassStudents_ColStudent"]">
                     <CellTemplate>
                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <MudAvatar Style="@GetAvatarStyle(context.Item)" Size="Size.Small">
-                                @GetInitials(context.Item)
-                            </MudAvatar>
+                            @if (context.Item.FotoUrl is not null)
+                            {
+                                <MudAvatar Style="@GetFotoStyle(context.Item.FotoUrl)" Size="Size.Small" />
+                            }
+                            else
+                            {
+                                <MudAvatar Style="@GetAvatarStyle(context.Item)" Size="Size.Small">
+                                    @GetInitials(context.Item)
+                                </MudAvatar>
+                            }
                             <span>@context.Item.Cognoms, @context.Item.Nom</span>
                         </MudStack>
                     </CellTemplate>
@@ -255,6 +363,14 @@
                 {
                     <TemplateColumn Title="" CellStyle="white-space:nowrap">
                         <CellTemplate>
+                            <MudFileUpload T="IBrowserFile" Accept=".jpg,.jpeg,.png"
+                                           FilesChanged="f => UploadFotoAsync(context.Item, f)">
+                                <ActivatorContent>
+                                    <MudIconButton Icon="@Icons.Material.Filled.PhotoCamera"
+                                                   Size="Size.Small" Color="Color.Primary"
+                                                   title="@Loc["Epss_FotoBtn"]" />
+                                </ActivatorContent>
+                            </MudFileUpload>
                             <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                            Color="Color.Primary" title="Editar"
                                            OnClick="() => StartEdit(context.Item)" />
@@ -295,6 +411,17 @@
     private IBrowserFile?  _importFile;
     private List<string>   _importErrors = [];
     private string?        _importSummary;
+
+    // ── Importació EPSS ───────────────────────────────────────────────────────
+    private IBrowserFile? _xlsFitxer;
+    private IBrowserFile? _zipFitxer;
+    private bool _carregantXls;
+    private bool _carregantZip;
+    private ImportacioAlumnesResult? _resultXls;
+    private ImportacioFotosResult?   _resultZip;
+    private string? _errorXls;
+    private string? _errorZip;
+    private int _fotoVersion; // cache-bust per fotos
 
     // ── Selecció massiva ──────────────────────────────────────────────────────
     private HashSet<int> _selected = [];
@@ -768,6 +895,80 @@
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
+    // ── Importació EPSS ───────────────────────────────────────────────────────
+
+    private void OnXlsSeleccionat(IBrowserFile f) { _xlsFitxer = f; _resultXls = null; _errorXls = null; }
+    private void OnZipSeleccionat(IBrowserFile f) { _zipFitxer = f; _resultZip = null; _errorZip = null; }
+
+    private async Task ImportarXlsAsync()
+    {
+        if (_xlsFitxer is null) return;
+        _carregantXls = true; _resultXls = null; _errorXls = null;
+        try
+        {
+            Api.SetToken(UserState.Token!);
+            using var content = new System.Net.Http.MultipartFormDataContent();
+            using var stream  = _xlsFitxer.OpenReadStream(10 * 1024 * 1024);
+            content.Add(new System.Net.Http.StreamContent(stream), "fitxer", _xlsFitxer.Name);
+            var (result, error) = await Api.ImportarAlumnesXlsAsync(ClassId, content);
+            if (error is not null) _errorXls = error;
+            else
+            {
+                _resultXls = result;
+                Snackbar.Add(Loc["Epss_ResultatAlumnes",
+                    result!.Importats, result.Actualitzats, result.Saltats].Value, Severity.Success);
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex) { _errorXls = ex.Message; }
+        finally { _carregantXls = false; _xlsFitxer = null; }
+    }
+
+    private async Task ImportarZipAsync()
+    {
+        if (_zipFitxer is null) return;
+        _carregantZip = true; _resultZip = null; _errorZip = null;
+        try
+        {
+            Api.SetToken(UserState.Token!);
+            using var content = new System.Net.Http.MultipartFormDataContent();
+            using var stream  = _zipFitxer.OpenReadStream(100 * 1024 * 1024);
+            content.Add(new System.Net.Http.StreamContent(stream), "zip", _zipFitxer.Name);
+            var (result, error) = await Api.ImportarFotosExamenAsync(content);
+            if (error is not null) _errorZip = error;
+            else
+            {
+                _resultZip = result;
+                Snackbar.Add(Loc["Epss_ResultatFotos", result!.Importades].Value, Severity.Success);
+                _fotoVersion++;
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex) { _errorZip = ex.Message; }
+        finally { _carregantZip = false; _zipFitxer = null; }
+    }
+
+    private async Task UploadFotoAsync(StudentDto student, IBrowserFile file)
+    {
+        try
+        {
+            Api.SetToken(UserState.Token!);
+            using var content = new System.Net.Http.MultipartFormDataContent();
+            using var stream  = file.OpenReadStream(5 * 1024 * 1024);
+            content.Add(new System.Net.Http.StreamContent(stream), "foto", file.Name);
+            var url = await Api.UploadStudentFotoAsync(ClassId, student.Id, content);
+            if (url is not null)
+            {
+                _fotoVersion++;
+                var idx = _students.FindIndex(s => s.Id == student.Id);
+                if (idx >= 0) _students[idx] = _students[idx] with { FotoUrl = url };
+                Snackbar.Add(Loc["Epss_FotoOk"].Value, Severity.Success);
+            }
+            else Snackbar.Add(Loc["Epss_FotoError"].Value, Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"{Loc["Epss_FotoError"]}: {ex.Message}", Severity.Error); }
+    }
+
     // ── Avatars ──────────────────────────────────────────────────────────────
 
     private static string GetInitials(StudentDto s)
@@ -779,6 +980,9 @@
 
     private static readonly string[] _avatarColors =
         ["#CC0000", "#1e293b", "#0891b2", "#059669", "#7c3aed", "#d97706", "#db2777"];
+
+    private string GetFotoStyle(string url) =>
+        $"background-image:url('{url}?v={_fotoVersion}');background-size:cover;background-position:center;width:28px;height:28px;min-width:28px";
 
     private static string GetAvatarStyle(StudentDto s)
     {

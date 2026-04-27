@@ -24,7 +24,7 @@ public interface IClassService
     Task<SendAllResult>        SendAllPasswordsAsync(int classId);
 }
 
-public class ClassService(AppDbContext db, IEmailService email) : IClassService
+public class ClassService(AppDbContext db, IEmailService email, IWebHostEnvironment env) : IClassService
 {
     // ── Classes ──────────────────────────────────────────────────────────────
 
@@ -72,11 +72,13 @@ public class ClassService(AppDbContext db, IEmailService email) : IClassService
 
     // ── Alumnes ──────────────────────────────────────────────────────────────
 
-    public async Task<List<StudentDto>> GetStudentsAsync(int classId) =>
-        await db.Students.Where(s => s.ClassId == classId)
+    public async Task<List<StudentDto>> GetStudentsAsync(int classId)
+    {
+        var list = await db.Students.Where(s => s.ClassId == classId)
             .OrderBy(s => s.NumLlista)
-            .Select(s => ToStudentDto(s))
             .ToListAsync();
+        return list.Select(ToStudentDto).ToList();
+    }
 
     public async Task<StudentDto> AddStudentAsync(int classId, CreateStudentRequest req)
     {
@@ -277,7 +279,14 @@ public class ClassService(AppDbContext db, IEmailService email) : IClassService
     private static ClassDto ToClassDto(Class c) => new(
         c.Id, c.Name, c.AcademicYear, c.CreatedAt, c.Students.Count);
 
-    private static StudentDto ToStudentDto(Student s) => new(
-        s.Id, s.ClassId, s.Nom, s.Cognoms, s.NomComplet, s.NumLlista, s.Email, s.CreatedAt);
+    private StudentDto ToStudentDto(Student s) => new(
+        s.Id, s.ClassId, s.Nom, s.Cognoms, s.NomComplet, s.NumLlista, s.Email, s.CreatedAt,
+        FotoUrlSiExisteix(s.Id));
+
+    private string? FotoUrlSiExisteix(int studentId)
+    {
+        var path = Path.Combine(env.WebRootPath, "fotos", "alumnes", $"{studentId}.jpg");
+        return File.Exists(path) ? $"/fotos/alumnes/{studentId}.jpg" : null;
+    }
 
 }

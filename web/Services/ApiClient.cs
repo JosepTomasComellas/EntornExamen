@@ -388,9 +388,9 @@ public class ApiClient
     }
 
     public async Task<(ImportacioAlumnesResult? Result, string? Error)>
-        ImportarAlumnesXlsAsync(MultipartFormDataContent form)
+        ImportarAlumnesXlsAsync(int classId, MultipartFormDataContent form)
     {
-        var resp = await _http.PostAsync("/api/examen/importar-alumnes-xls", form);
+        var resp = await _http.PostAsync($"/api/examen/importar-alumnes-xls?classId={classId}", form);
         if (resp.IsSuccessStatusCode)
             return (await resp.Content.ReadFromJsonAsync<ImportacioAlumnesResult>(_json), null);
         try
@@ -401,6 +401,18 @@ public class ApiClient
             return (null, err ?? "Error desconegut.");
         }
         catch { return (null, "Error desconegut."); }
+    }
+
+    public async Task<string?> UploadStudentFotoAsync(int classId, int studentId, MultipartFormDataContent form)
+    {
+        var resp = await _http.PostAsync($"/api/classes/{classId}/students/{studentId}/foto", form);
+        if (!resp.IsSuccessStatusCode) return null;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+            return doc.RootElement.TryGetProperty("url", out var u) ? u.GetString() : null;
+        }
+        catch { return null; }
     }
 
     public Task<List<AlumneMacDto>?> GetExamenMacsAsync() =>

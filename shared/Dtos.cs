@@ -29,7 +29,7 @@ public record UpdateClassRequest(string Name, string? AcademicYear);
 // ─── Alumnes ─────────────────────────────────────────────────────────────────
 public record StudentDto(
     int Id, int ClassId, string Nom, string Cognoms, string NomComplet,
-    int NumLlista, string Email, DateTime CreatedAt);
+    int NumLlista, string Email, DateTime CreatedAt, string? FotoUrl = null);
 
 public record CreateStudentRequest(
     string Nom, string Cognoms, int NumLlista, string Email);
