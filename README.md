@@ -1,4 +1,4 @@
-# EntornExamen · v2.0.0
+# EntornExamen · v2.3.0
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 
@@ -295,6 +295,14 @@ dotnet test AutoCo.Tests/
 ---
 
 ## Changelog
+
+### v2.3.0 (2026-04-27)
+- **Fix crític**: check-in crash per `IpAssignada` truncada — columna ampliada a `NVARCHAR(45)` + normalització IPv4-mapped IPv6 (`::ffff:x.x.x.x → x.x.x.x`)
+- Textos de la pàgina d'inici actualitzats: "Control de Presència en Examens" (eliminades referències AutoCo)
+- Icons d'inici actualitzats: Monitor / WiFi / Campaign
+- Port HTTPS nginx canviat a 4445 (`docker-compose.yml`)
+- Portal alumne: botó "Tornar a l'inici" a la pantalla de login
+- Gestió alumnes: importació normal simplificada a CSV (XLS → secció EPSS); botons de fila alineats horitzontalment
 
 ### v2.0.0 (2026-04-27)
 - **Desvinculació total d'AutoCo** — sistema independent i net

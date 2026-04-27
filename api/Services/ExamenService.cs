@@ -286,6 +286,9 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
 
     public async Task<(CheckinResponse? Resp, string? Error)> CheckinAsync(CheckinRequest req, string clientIp)
     {
+        if (System.Net.IPAddress.TryParse(clientIp, out var ipAddr) && ipAddr.IsIPv4MappedToIPv6)
+            clientIp = ipAddr.MapToIPv4().ToString();
+
         var emailNorm = req.Email.Trim().ToLower();
 
         var student = await db.Students

@@ -162,7 +162,7 @@ using (var scope = app.Services.CreateScope())
                 [SessioId]        INT          NOT NULL,
                 [StudentId]       INT          NULL,
                 [MacAddress]      NVARCHAR(17) NOT NULL,
-                [IpAssignada]     NVARCHAR(15) NULL,
+                [IpAssignada]     NVARCHAR(45) NULL,
                 [ConnectatAt]     DATETIME2    NOT NULL DEFAULT GETUTCDATE(),
                 [DesconnectatAt]  DATETIME2    NULL,
                 [UltimCheckinAt]  DATETIME2    NULL,
@@ -177,6 +177,10 @@ using (var scope = app.Services.CreateScope())
                 ON [RegistresConnexio] ([SessioId], [MacAddress]);
             CREATE INDEX [IX_RegistresConnexio_IpAssignada]
                 ON [RegistresConnexio] ([IpAssignada]);
+        END
+        ELSE IF COL_LENGTH('RegistresConnexio', 'IpAssignada') < 45
+        BEGIN
+            ALTER TABLE [RegistresConnexio] ALTER COLUMN [IpAssignada] NVARCHAR(45) NULL;
         END
 
         IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'PeticiosDns')

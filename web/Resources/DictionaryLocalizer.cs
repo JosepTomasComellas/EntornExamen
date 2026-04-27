@@ -43,13 +43,13 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
         ["Reset_Success"]            = "Contrasenya canviada correctament. Ja pots iniciar sessió.",
 
         // ── Inici (Index) ─────────────────────────────────────────────────────
-        ["Home_Title"]        = "Sistema d'Avaluació entre Iguals",
-        ["Home_Subtitle"]     = "Autoavaluació · Coavaluació · Resultats",
+        ["Home_Title"]        = "Control de Presència en Examens",
+        ["Home_Subtitle"]     = "Monitoratge en temps real sobre WiFi aïllada",
         ["Home_TeacherAccess"] = "Accés Professor",
         ["Home_StudentAccess"] = "Accés Alumne",
-        ["Home_Autoevaluation"] = "Autoavaluació",
-        ["Home_Coevaluation"]   = "Coavaluació",
-        ["Home_Results"]        = "Resultats",
+        ["Home_Feature1"]       = "Monitoratge",
+        ["Home_Feature2"]       = "Temps real",
+        ["Home_Feature3"]       = "Alertes",
         ["Home_Footer"]         = "Salesians de Sarrià · Dept. d'Informàtica",
 
         // ── Navegació i barra superior ─────────────────────────────────────────
@@ -810,13 +810,13 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
         ["Reset_Success"]            = "Contraseña cambiada correctamente. Ya puedes iniciar sesión.",
 
         // ── Inici (Index) ─────────────────────────────────────────────────────
-        ["Home_Title"]         = "Sistema de Evaluación entre Iguales",
-        ["Home_Subtitle"]      = "Autoevaluación · Coevaluación · Resultados",
+        ["Home_Title"]         = "Control de Presencia en Exámenes",
+        ["Home_Subtitle"]      = "Monitoreo en tiempo real sobre WiFi aislada",
         ["Home_TeacherAccess"] = "Acceso Profesor",
         ["Home_StudentAccess"] = "Acceso Alumno",
-        ["Home_Autoevaluation"] = "Autoevaluación",
-        ["Home_Coevaluation"]   = "Coevaluación",
-        ["Home_Results"]        = "Resultados",
+        ["Home_Feature1"]       = "Monitoreo",
+        ["Home_Feature2"]       = "Tiempo real",
+        ["Home_Feature3"]       = "Alertas",
         ["Home_Footer"]         = "Salesians de Sarrià · Dept. d'Informàtica",
 
         // ── Navegació i barra superior ─────────────────────────────────────────
