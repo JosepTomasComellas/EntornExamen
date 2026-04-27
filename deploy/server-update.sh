@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# AutoCo - Actualització directa des de GitHub
-# Us: bash /docker/AutoCo/deploy/server-update.sh
+# EntornExamen - Actualització directa des de GitHub
+# Us: bash /docker/EntornExamen/deploy/server-update.sh
 # =============================================================================
 set -euo pipefail
 
@@ -9,7 +9,7 @@ DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo ""
 echo "========================================================"
-echo "  AutoCo - Actualització des de GitHub"
+echo "  EntornExamen - Actualització des de GitHub"
 echo "  Directori: $DEPLOY_DIR"
 echo "========================================================"
 
@@ -20,7 +20,7 @@ if [ ! -d ".git" ]; then
     echo ""
     echo "[ERROR] $DEPLOY_DIR no és un repositori git."
     echo "        Clona el repo primer:"
-    echo "        git clone https://github.com/JosepTomasComellas/AutoCo.git $DEPLOY_DIR"
+    echo "        git clone https://github.com/JosepTomasComellas/EntornExamen.git $DEPLOY_DIR"
     exit 1
 fi
 
