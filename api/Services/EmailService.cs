@@ -74,7 +74,7 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
 
             Departament d'Informàtica · Salesians de Sarrià
             """;
-        return await SendAsync(toEmail, toName, "Credencials d'accés – AutoCo", body);
+        return await SendAsync(toEmail, toName, "Credencials d'accés – Entorn d'Examens", body);
     }
 
     public async Task<bool> SendReminderAsync(string toEmail, string toName, string activityName, string className)
@@ -118,7 +118,7 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
         var body = $"""
             Hola, {toName}!
 
-            Has sol·licitat restablir la teva contrasenya d'AutoCo.
+            Has sol·licitat restablir la teva contrasenya d'Entorn d'Examens.
 
             ─────────────────────────────────────
              CODI DE VERIFICACIÓ
@@ -131,7 +131,7 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
 
             Departament d'Informàtica · Salesians de Sarrià
             """;
-        return await SendAsync(toEmail, toName, "Restabliment de contrasenya – AutoCo", body);
+        return await SendAsync(toEmail, toName, "Restabliment de contrasenya – Entorn d'Examens", body);
     }
 
     private async Task<bool> SendAsync(string toEmail, string toName, string subject, string body)

@@ -7,7 +7,7 @@ public static class SeedData
 {
     public static async Task InitializeAsync(AppDbContext db, IConfiguration config)
     {
-        var email    = config["Admin:Email"]    ?? "admin@autoco.cat";
+        var email    = config["Admin:Email"]    ?? "admin@entornexamen.cat";
         var password = config["Admin:Password"] ?? "Admin123!";
         var nom      = config["Admin:Nom"]      ?? "Administrador";
         var cognoms  = config["Admin:Cognoms"]  ?? "";

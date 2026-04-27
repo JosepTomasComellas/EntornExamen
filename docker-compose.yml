@@ -1,5 +1,5 @@
 networks:
-  autoco-net:
+  entornexamen-net:
     driver: bridge
 
 volumes:
@@ -13,7 +13,7 @@ services:
 
   db:
     image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: autoco-db
+    container_name: entornexamen-db
     environment:
       ACCEPT_EULA:        "Y"
       MSSQL_SA_PASSWORD:  "${MSSQL_SA_PASSWORD}"
@@ -24,7 +24,7 @@ services:
       - db-data:/var/opt/mssql
       - ./backups:/var/opt/mssql/backup   # Còpies de seguretat accessibles al sistema de fitxers
     networks:
-      - autoco-net
+      - entornexamen-net
     healthcheck:
       test: ["CMD", "/opt/mssql-tools18/bin/sqlcmd",
              "-S", "localhost", "-U", "sa", "-P", "${MSSQL_SA_PASSWORD}",
@@ -37,14 +37,14 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: autoco-redis
+    container_name: entornexamen-redis
     command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy volatile-lru
     expose:
       - "6379"
     volumes:
       - redis-data:/data
     networks:
-      - autoco-net
+      - entornexamen-net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -56,11 +56,11 @@ services:
     build:
       context:    .
       dockerfile: api/Dockerfile
-    container_name: autoco-api
+    container_name: entornexamen-api
     environment:
       ASPNETCORE_ENVIRONMENT:          Production
       ConnectionStrings__DefaultConnection: >
-        Server=db;Database=AutoCoAvaluacio;
+        Server=db;Database=EntornExamen;
         User Id=sa;Password=${MSSQL_SA_PASSWORD};
         TrustServerCertificate=True
       JwtSettings__Secret:          "${JWT_SECRET}"
@@ -90,7 +90,7 @@ services:
       - /var/lib/dhcp/dhcpd.leases:/data/dhcpd.leases:ro
       - /var/log/named/queries.log:/data/dns-queries.log:ro
     networks:
-      - autoco-net
+      - entornexamen-net
     depends_on:
       db:
         condition: service_healthy
@@ -102,7 +102,7 @@ services:
     build:
       context:    .
       dockerfile: web/Dockerfile
-    container_name: autoco-web
+    container_name: entornexamen-web
     environment:
       ASPNETCORE_ENVIRONMENT:  Production
       ApiSettings__BaseUrl:    "http://api:8080"
@@ -111,7 +111,7 @@ services:
       - dp-keys:/app/dp-keys
       - fotos-alumnes:/app/wwwroot/fotos/alumnes
     networks:
-      - autoco-net
+      - entornexamen-net
     depends_on:
       - api
       - redis
@@ -121,14 +121,14 @@ services:
     build:
       context:    ./nginx
       dockerfile: Dockerfile
-    container_name: autoco-nginx
+    container_name: entornexamen-nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx/ssl:/etc/nginx/ssl
     networks:
-      - autoco-net
+      - entornexamen-net
     depends_on:
       - web
     restart: unless-stopped

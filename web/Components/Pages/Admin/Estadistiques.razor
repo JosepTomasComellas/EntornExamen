@@ -163,7 +163,7 @@ else
                     .FirstOrDefault(l => l.Year == m.Year && l.Month == m.Month)?.Count ?? 0))
                 .ToArray();
 
-            await JS.InvokeVoidAsync("autocoCharts.renderBar", "chart-monthly", labels,
+            await JS.InvokeVoidAsync("entornexamenCharts.renderBar", "chart-monthly", labels,
                 new[]
                 {
                     new { label = "Accessos professors", data = loginData, color = "#1d4ed8" }
@@ -206,6 +206,6 @@ else
 
     public async ValueTask DisposeAsync()
     {
-        try { await JS.InvokeVoidAsync("autocoCharts.destroy", "chart-monthly"); } catch { }
+        try { await JS.InvokeVoidAsync("entornexamenCharts.destroy", "chart-monthly"); } catch { }
     }
 }

@@ -1,5 +1,5 @@
-// AutoCo — Chart.js interop helpers
-window.autocoCharts = (() => {
+// EntornExamen — Chart.js interop helpers
+window.entornexamenCharts = (() => {
     const _instances = {};
 
     function destroy(canvasId) {
@@ -46,15 +46,15 @@ window.autocoCharts = (() => {
                                 const v = ctx.raw;
                                 return v === null || v === undefined
                                     ? `${ctx.dataset.label}: —`
-                                    : `${ctx.dataset.label}: ${Number(v).toFixed(1)}`;
+                                    : `${ctx.dataset.label}: ${Math.round(v)}`;
                             }
                         }
                     }
                 },
                 scales: {
                     y: {
-                        min: 0, max: 10,
-                        ticks: { stepSize: 2, color: textColor },
+                        beginAtZero: true,
+                        ticks: { color: textColor, precision: 0 },
                         grid:  { color: gridColor }
                     },
                     x: {

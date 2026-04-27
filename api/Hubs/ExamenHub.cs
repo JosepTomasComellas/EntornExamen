@@ -1,8 +1,8 @@
-using AutoCo.Shared.DTOs;
+using EntornExamen.Shared.DTOs;
 using StackExchange.Redis;
 using System.Text.Json;
 
-namespace AutoCo.Api.Hubs;
+namespace EntornExamen.Api.Hubs;
 
 /// <summary>
 /// Publicador d'events de l'Entorn Examen cap a Redis.

@@ -3,12 +3,12 @@
 @inject NavigationManager Nav
 @inject IStringLocalizer<SharedResources> Loc
 
-<PageTitle>AutoCo Avaluació</PageTitle>
+<PageTitle>Entorn d'Examens</PageTitle>
 
 @if (UserState.IsLoggedIn)
 {
     if (UserState.IsProfessor) Nav.NavigateTo("/professor/dashboard");
-    else Nav.NavigateTo("/alumne/dashboard");
+    else Nav.NavigateTo("/examen");
 }
 
 <div style="min-height:80vh;display:flex;align-items:center;justify-content:center;padding:1rem 0">
