@@ -84,6 +84,7 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
         ["Action_Export"]  = "Exportar",
         ["Action_Send"]    = "Enviar",
         ["Action_Confirm"] = "Confirmar",
+        ["Action_Accept"]  = "Acceptar",
         ["Action_Back"]    = "← Tornar",
         ["Action_Duplicate"] = "Duplicar",
         ["Action_Move"]    = "Moure",
@@ -730,6 +731,12 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
         ["ExamenPortal_TeacherMsg"]    = "Missatge del professor",
         ["ExamenPortal_ReadMsg"]       = "He llegit el missatge",
         ["ExamenPortal_SessionEnded"]  = "La sessió d'examen ha finalitzat.",
+        ["ExamenPortal_ExitExam"]      = "Sortir de l'examen",
+        ["ExamenPortal_ExitTitle"]     = "Sortir de l'examen",
+        ["ExamenPortal_ExitConfirm"]   = "Estàs segur que vols sortir? El professor veurà que t'has desconnectat.",
+        ["ExamenPortal_ExitConfirmBtn"] = "Sí, sortir",
+        ["ExamenPortal_ExpulsatTitle"] = "Has estat expulsat",
+        ["ExamenPortal_ExpulsatMsg"]   = "El professor t'ha expulsat de la sessió d'examen.",
 
         // ── Admin: Dispositius MAC ────────────────────────────────────────────
         ["Macs_Title"]         = "Dispositius d'examen (MACs)",
@@ -850,6 +857,7 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
         ["Action_Export"]  = "Exportar",
         ["Action_Send"]    = "Enviar",
         ["Action_Confirm"] = "Confirmar",
+        ["Action_Accept"]  = "Aceptar",
         ["Action_Back"]    = "← Volver",
         ["Action_Duplicate"] = "Duplicar",
         ["Action_Move"]    = "Mover",
@@ -1496,6 +1504,12 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
         ["ExamenPortal_TeacherMsg"]    = "Mensaje del profesor",
         ["ExamenPortal_ReadMsg"]       = "He leído el mensaje",
         ["ExamenPortal_SessionEnded"]  = "La sesión de examen ha finalizado.",
+        ["ExamenPortal_ExitExam"]      = "Salir del examen",
+        ["ExamenPortal_ExitTitle"]     = "Salir del examen",
+        ["ExamenPortal_ExitConfirm"]   = "¿Estás seguro de que quieres salir? El profesor verá que te has desconectado.",
+        ["ExamenPortal_ExitConfirmBtn"] = "Sí, salir",
+        ["ExamenPortal_ExpulsatTitle"] = "Has sido expulsado",
+        ["ExamenPortal_ExpulsatMsg"]   = "El profesor te ha expulsado de la sesión de examen.",
 
         // ── Admin: Dispositius MAC ────────────────────────────────────────────
         ["Macs_Title"]         = "Dispositivos de examen (MACs)",

@@ -1,4 +1,4 @@
-# EntornExamen · v2.4.0
+# EntornExamen · v2.5.0
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 
@@ -295,6 +295,15 @@ dotnet test AutoCo.Tests/
 ---
 
 ## Changelog
+
+### v2.5.0 (2026-04-27)
+- Alumne: botó "Sortir de l'examen" amb diàleg de confirmació; el professor ho veu com a sortida voluntària
+- Professor: botó "Expulsar alumne" al panell de detall (amb confirmació); l'alumne rep un avís i és desconnectat
+- Un alumne només pot connectar-se des d'una estació alhora
+- Auto-refresh del dashboard del professor cada 30 s (fallback si Redis no publica)
+- Camp MAC al panell de detall: ara distingeix correctament MAC real vs IP de fallback (sense DHCP)
+- Sessions tancades: botó "Eliminar sessió" per esborrar-les del registre
+- Sonoritat de desconnexió voluntària diferenciada de la involuntària al panell del professor
 
 ### v2.4.0 (2026-04-27)
 - Plafó professor: pannell de detall d'estació ara apareix **al costat** de la graella (layout 2 columnes) en lloc d'un drawer que la comprimia

@@ -146,6 +146,9 @@ public class ApiClient
     public Task<bool> TancarExamenSessioAsync(int sessioId) =>
         PutNoContentAsync($"/api/examen/sessions/{sessioId}/tancar", null);
 
+    public Task<bool> EliminarExamenSessioAsync(int sessioId) =>
+        DeleteAsync($"/api/examen/sessions/{sessioId}");
+
     public Task<bool> ReobrirExamenSessioAsync(int sessioId) =>
         PutNoContentAsync($"/api/examen/sessions/{sessioId}/reobrir", null);
 
@@ -166,6 +169,12 @@ public class ApiClient
             ?? $"examen_{sessioId}.csv";
         return (bytes, fileName.Trim('"'));
     }
+
+    public Task<bool> SortirExamenAsync() =>
+        PostNoContentAsync("/api/examen/sortida", null);
+
+    public Task<bool> ExpulsarAlumneAsync(int sessioId, int studentId) =>
+        PostNoContentAsync($"/api/examen/sessions/{sessioId}/alumnes/{studentId}/expulsar", null);
 
     public async Task<(CheckinResponse? Resp, string? Error)> ExamenCheckinAsync(CheckinRequest req)
     {

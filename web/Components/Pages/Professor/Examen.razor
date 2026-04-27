@@ -73,6 +73,11 @@
                    OnClick="() => _mostrarDialegNovaSessio = true">
             @Loc["Examen_StartSession"]
         </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.DeleteForever"
+                   OnClick="() => _confirmarEliminarSessio = true">
+            Eliminar sessió
+        </MudButton>
     }
 
     @if (_sessio is not null)
@@ -360,16 +365,19 @@
                                  Style="font-weight:700;text-transform:uppercase;letter-spacing:.05em">
                             Xarxa
                         </MudText>
+                        @{
+                            var teMac = _alumneSeleccionat.MacAddress.Contains(':');
+                        }
                         <MudStack Row="true" Spacing="1">
                             <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width:72px">MAC</MudText>
                             <MudText Typo="Typo.caption" Style="font-family:monospace">
-                                @_alumneSeleccionat.MacAddress
+                                @(teMac ? _alumneSeleccionat.MacAddress : "—")
                             </MudText>
                         </MudStack>
                         <MudStack Row="true" Spacing="1">
                             <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width:72px">IP</MudText>
                             <MudText Typo="Typo.caption" Style="font-family:monospace">
-                                @(_alumneSeleccionat.IpAssignada ?? "—")
+                                @(_alumneSeleccionat.IpAssignada ?? (!teMac ? _alumneSeleccionat.MacAddress : "—"))
                             </MudText>
                         </MudStack>
                         <MudStack Row="true" Spacing="1">
@@ -392,6 +400,19 @@
                             </MudStack>
                         }
                     </MudStack>
+
+                    <!-- Acció d'expulsió -->
+                    @if (_sessio?.Activa == true && _alumneSeleccionat.StudentId.HasValue &&
+                         _alumneSeleccionat.Estat != EstatConnexioDto.Desconnectat)
+                    {
+                        <MudDivider />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" FullWidth="true"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.PersonRemove"
+                                   OnClick="() => _confirmarExpulsio = true">
+                            Expulsar alumne
+                        </MudButton>
+                    }
 
                     <!-- Peticions DNS -->
                     <MudDivider />
@@ -432,6 +453,57 @@
     }
 
 </MudGrid>
+
+<!-- Diàleg confirmació d'eliminació de sessió -->
+<MudDialog @bind-Visible="_confirmarEliminarSessio">
+    <TitleContent>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Error" />
+            <MudText Typo="Typo.h6">Eliminar sessió tancada</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning">
+            S'eliminarà la sessió <strong>@(_sessio?.Titol ?? "sense títol")</strong>
+            i tots els registres de connexió associats. Aquesta acció no es pot desfer.
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _confirmarEliminarSessio = false">
+            @Loc["Action_Cancel"]
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error"
+                   OnClick="EliminarSessio" Disabled="_carregant">
+            Eliminar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Diàleg confirmació d'expulsió -->
+<MudDialog @bind-Visible="_confirmarExpulsio">
+    <TitleContent>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.PersonRemove" Color="Color.Error" />
+            <MudText Typo="Typo.h6">Expulsar alumne</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning">
+            Segur que vols expulsar
+            <strong>@_alumneSeleccionat?.Nom @_alumneSeleccionat?.Cognoms</strong>
+            de la sessió? L'alumne rebrà un avís i serà desconnectat.
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _confirmarExpulsio = false">
+            @Loc["Action_Cancel"]
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error"
+                   OnClick="ExpulsarAlumne" Disabled="_carregant">
+            Expulsar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
 
 <!-- Diàleg nova sessió -->
 <MudDialog @bind-Visible="_mostrarDialegNovaSessio">
@@ -528,8 +600,11 @@
 
     private string              _cerca      = "";
     private EstatConnexioDto?   _filtreEstat;
+    private bool                _confirmarExpulsio;
+    private bool                _confirmarEliminarSessio;
 
     private Func<string, object, Task>? _sessioHandler;
+    private System.Threading.Timer?     _refreshTimer;
 
     private int _connectats => _alumnes.Count(a =>
         a.Estat is EstatConnexioDto.Connectat or EstatConnexioDto.SenseCheckin);
@@ -577,6 +652,14 @@
         _sessioHandler = async (eventNom, data) =>
             await ProcessarEventAsync(eventNom, data);
         ExamenNotif.SubscriuSessio(_sessioId.Value, _sessioHandler);
+
+        // Auto-refresh cada 30 s com a fallback si Redis no publica
+        _refreshTimer?.Dispose();
+        _refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            await CarregarDashboard();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
     private async Task CarregarDashboard()
@@ -608,6 +691,14 @@
                 AfegirAlerta($"Desconnectat: {evt.Nom} {evt.Cognoms}",
                     Icons.Material.Filled.LinkOff, Color.Error);
                 await JS.InvokeVoidAsync("examenSoDesconnexio");
+                break;
+            case "AlumneDesconnectatVoluntari" when data is ExamenEventAlumne evt:
+                ActualitzarAlumne(evt.Mac, a => a with
+                {
+                    Estat = EstatConnexioDto.Desconnectat
+                });
+                AfegirAlerta($"Ha sortit voluntàriament: {evt.Nom} {evt.Cognoms}",
+                    Icons.Material.Filled.ExitToApp, Color.Warning);
                 break;
             case "NouCheckin" when data is ExamenEventAlumne evt:
                 ActualitzarAlumne(evt.Mac, a => a with
@@ -698,6 +789,38 @@
         _textMissatge          = "";
     }
 
+    private async Task EliminarSessio()
+    {
+        if (_sessioId is null) return;
+        _confirmarEliminarSessio = false;
+        _carregant = true;
+        await Api.EliminarExamenSessioAsync(_sessioId.Value);
+        _carregant = false;
+        _sessioId          = null;
+        _sessio            = null;
+        _alumnes           = [];
+        _mostraDetall      = false;
+        _alumneSeleccionat = null;
+        _sessions = await Api.GetExamenSessionsAsync() ?? [];
+        var activa = _sessions.FirstOrDefault(s => s.Activa);
+        if (activa is not null)
+            await SeleccionarSessio(activa.Id);
+        StateHasChanged();
+    }
+
+    private async Task ExpulsarAlumne()
+    {
+        if (_sessioId is null || _alumneSeleccionat?.StudentId is null) return;
+        _confirmarExpulsio = false;
+        _carregant = true;
+        await Api.ExpulsarAlumneAsync(_sessioId.Value, _alumneSeleccionat.StudentId.Value);
+        _carregant = false;
+        _mostraDetall      = false;
+        _alumneSeleccionat = null;
+        await CarregarDashboard();
+        StateHasChanged();
+    }
+
     private async Task EsborrarMissatge()
     {
         if (_sessioId is null) return;
@@ -746,6 +869,7 @@
 
     public void Dispose()
     {
+        _refreshTimer?.Dispose();
         if (_sessioId.HasValue && _sessioHandler is not null)
             ExamenNotif.DesubscriuSessio(_sessioId.Value, _sessioHandler);
     }

@@ -26,6 +26,9 @@ public interface IExamenService
     Task<(ImportacioAlumnesResult Result, string? Error)> ImportarAlumnesXlsAsync(Stream xlsStream, int classId, bool isAdmin);
     Task<bool> UploadStudentFotoAsync(int studentId, Stream foto, string wwwrootPath);
     Task<(ImportacioFotosResult Result, string? Error)> ImportarFotosAsync(Stream zipStream, string wwwrootPath);
+    Task<(bool Ok, string? Error)> EliminarSessioAsync(int sessioId, int professorId, bool isAdmin);
+    Task<(bool Ok, string? Error)> SortirAsync(string clientIp);
+    Task<(bool Ok, string? Error)> ExpulsarAsync(int sessioId, int studentId, int professorId, bool isAdmin);
     Task<List<AlumneMacDto>> GetMacsAsync(bool isAdmin);
     Task<bool> DeleteMacAsync(int id, bool isAdmin);
 }
@@ -314,6 +317,18 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 (r.StudentId == student.Id ||
                  (!string.IsNullOrEmpty(clientIp) && r.IpAssignada == clientIp)));
 
+        // Comprovació d'una sola estació: si l'alumne ja té un registre actiu des d'una altra IP, rebutja
+        if (registre is null || (registre.IpAssignada != clientIp && registre.StudentId == student.Id))
+        {
+            var altreRegistre = await db.RegistresConnexio
+                .FirstOrDefaultAsync(r => r.SessioId == sessio.Id &&
+                    r.StudentId == student.Id &&
+                    r.IpAssignada != clientIp &&
+                    r.Estat != EstatConnexio.Desconnectat);
+            if (altreRegistre is not null)
+                return (null, "Ja estàs connectat des d'una altra estació.");
+        }
+
         string mac = "";
         if (registre is not null)
         {
@@ -453,6 +468,82 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             _ = hub.NotificaNovaPeticioExternaAsync(registre.SessioId, new ExamenEventDns(
                 registre.StudentId, registre.Student?.Nom, req.Domini, req.Timestamp));
         }
+    }
+
+    // ─── Eliminació de sessió tancada ────────────────────────────────────────
+
+    public async Task<(bool Ok, string? Error)> EliminarSessioAsync(
+        int sessioId, int professorId, bool isAdmin)
+    {
+        var sessio = await db.SessionsExamen
+            .Include(s => s.Registres)
+                .ThenInclude(r => r.PeticiosDns)
+            .FirstOrDefaultAsync(s => s.Id == sessioId &&
+                (isAdmin || s.ProfessorId == professorId));
+        if (sessio is null) return (false, "Sessió no trobada.");
+        if (sessio.Activa) return (false, "No es pot eliminar una sessió activa. Tanca-la primer.");
+
+        db.SessionsExamen.Remove(sessio);
+        await db.SaveChangesAsync();
+        return (true, null);
+    }
+
+    // ─── Sortida voluntària de l'alumne ──────────────────────────────────────
+
+    public async Task<(bool Ok, string? Error)> SortirAsync(string clientIp)
+    {
+        if (System.Net.IPAddress.TryParse(clientIp, out var ipAddr) && ipAddr.IsIPv4MappedToIPv6)
+            clientIp = ipAddr.MapToIPv4().ToString();
+
+        var registre = await db.RegistresConnexio
+            .Include(r => r.Student)
+            .FirstOrDefaultAsync(r => r.IpAssignada == clientIp &&
+                r.Estat != EstatConnexio.Desconnectat);
+
+        if (registre is null)
+            return (false, "No s'ha trobat cap connexió activa per a aquesta IP.");
+
+        registre.Estat          = EstatConnexio.Desconnectat;
+        registre.DesconnectatAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        _ = hub.NotificaSortidaVoluntariaAsync(registre.SessioId, new ExamenEventAlumne(
+            registre.StudentId, registre.Student?.Nom, registre.Student?.Cognoms,
+            clientIp, registre.MacAddress, registre.DesconnectatAt.Value));
+
+        return (true, null);
+    }
+
+    // ─── Expulsió d'alumne pel professor ──────────────────────────────────────
+
+    public async Task<(bool Ok, string? Error)> ExpulsarAsync(
+        int sessioId, int studentId, int professorId, bool isAdmin)
+    {
+        var sessio = await db.SessionsExamen
+            .FirstOrDefaultAsync(s => s.Id == sessioId &&
+                (isAdmin || s.ProfessorId == professorId));
+        if (sessio is null) return (false, "Sessió no trobada.");
+
+        var registre = await db.RegistresConnexio
+            .Include(r => r.Student)
+            .FirstOrDefaultAsync(r => r.SessioId == sessioId &&
+                r.StudentId == studentId &&
+                r.Estat != EstatConnexio.Desconnectat);
+        if (registre is null) return (false, "L'alumne no està connectat.");
+
+        registre.Estat          = EstatConnexio.Desconnectat;
+        registre.DesconnectatAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        // Notifica l'alumne individualment (per mostrar missatge d'expulsió)
+        _ = hub.NotificaAlumneExpulsatAsync(studentId);
+
+        // Notifica el professor del desconnectat
+        _ = hub.NotificaAlumneDesconnectatAsync(sessioId, new ExamenEventAlumne(
+            registre.StudentId, registre.Student?.Nom, registre.Student?.Cognoms,
+            registre.IpAssignada, registre.MacAddress, registre.DesconnectatAt.Value));
+
+        return (true, null);
     }
 
     // ─── Gestió de MACs ──────────────────────────────────────────────────────

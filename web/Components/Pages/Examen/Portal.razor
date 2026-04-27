@@ -137,12 +137,66 @@
                         Value="@(CheckinInterval > 0 ? (100 - _segonsRestants * 100 / CheckinInterval) : 0)"
                         Color="Color.Success" Rounded="true" Size="Size.Small"
                         Style="width:100%" />
+
+                    <MudDivider />
+
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" FullWidth="true"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Logout"
+                               OnClick="() => _confirmarSortida = true">
+                        @Loc["ExamenPortal_ExitExam"]
+                    </MudButton>
                 </MudStack>
             </MudCardContent>
         </MudCard>
     }
 
 </MudContainer>
+
+<!-- Diàleg de confirmació de sortida voluntària -->
+<MudDialog @bind-Visible="_confirmarSortida">
+    <TitleContent>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.Logout" Color="Color.Error" />
+            <MudText Typo="Typo.h6">@Loc["ExamenPortal_ExitTitle"]</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning">
+            @Loc["ExamenPortal_ExitConfirm"]
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _confirmarSortida = false">
+            @Loc["Action_Cancel"]
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error"
+                   OnClick="SortirExamen" Disabled="_carregant">
+            @Loc["ExamenPortal_ExitConfirmBtn"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Diàleg d'expulsió pel professor -->
+<MudDialog @bind-Visible="_mostrarExpulsat">
+    <TitleContent>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.Block" Color="Color.Error" />
+            <MudText Typo="Typo.h6">@Loc["ExamenPortal_ExpulsatTitle"]</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled">
+            @Loc["ExamenPortal_ExpulsatMsg"]
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="TancarExpulsat">
+            @Loc["Action_Accept"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
 
 <!-- Diàleg obligatori del missatge del professor -->
 <MudDialog @bind-Visible="_mostrarMissatge">
@@ -183,6 +237,8 @@
 
     private bool   _mostrarMissatge;
     private string _missatgeProfessor = "";
+    private bool   _confirmarSortida;
+    private bool   _mostrarExpulsat;
 
     private Func<string, object, Task>? _alumneHandler;
 
@@ -262,9 +318,41 @@
                     _timer = null;
                     await InvokeAsync(StateHasChanged);
                     break;
+                case "AlumneExpulsat":
+                    _mostrarExpulsat = true;
+                    await InvokeAsync(StateHasChanged);
+                    break;
             }
         };
         ExamenNotif.SubscriuAlumne(studentId, _alumneHandler);
+    }
+
+    private async Task SortirExamen()
+    {
+        _confirmarSortida = false;
+        _carregant = true;
+        StateHasChanged();
+        await Api.SortirExamenAsync();
+        _carregant   = false;
+        _checkinResp = null;
+        _fase        = Fase.Email;
+        _errorEmail  = null;
+        _timer?.Dispose();
+        _timer = null;
+        if (_alumneHandler is not null && _checkinResp is not null)
+            ExamenNotif.DesubscriuAlumne(_checkinResp.Alumne.StudentId, _alumneHandler);
+        StateHasChanged();
+    }
+
+    private void TancarExpulsat()
+    {
+        _mostrarExpulsat = false;
+        _checkinResp     = null;
+        _fase            = Fase.Email;
+        _errorEmail      = Loc["ExamenPortal_ExpulsatMsg"].Value;
+        _timer?.Dispose();
+        _timer = null;
+        StateHasChanged();
     }
 
     private void IniciaTimer()

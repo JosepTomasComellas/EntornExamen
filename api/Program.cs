@@ -218,6 +218,14 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi(); // disponible a /openapi/v1.json
 }
 
+// Llegeix X-Real-IP / X-Forwarded-For des del proxy nginx (Docker)
+app.UseForwardedHeaders(new Microsoft.AspNetCore.HttpOverrides.ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto,
+    KnownNetworks    = { new Microsoft.AspNetCore.HttpOverrides.IPNetwork(
+                             System.Net.IPAddress.Parse("172.0.0.0"), 8) }
+});
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -655,6 +663,14 @@ app.MapPut("/api/examen/sessions/{id:int}/reobrir", async (int id, IExamenServic
     return ok ? Results.NoContent() : Results.Conflict(new { error });
 }).RequireAuthorization();
 
+app.MapDelete("/api/examen/sessions/{id:int}", async (int id, IExamenService svc,
+    ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var (ok, error) = await svc.EliminarSessioAsync(id, GetUserId(user), IsAdmin(user));
+    return ok ? Results.NoContent() : Results.BadRequest(new { error });
+}).RequireAuthorization();
+
 app.MapPut("/api/examen/sessions/{id:int}/missatge", async (int id, MissatgeRequest req,
     IExamenService svc, ClaimsPrincipal user) =>
 {
@@ -694,12 +710,31 @@ app.MapPost("/api/examen/checkin", async (CheckinRequest req, IExamenService svc
 {
     if (string.IsNullOrWhiteSpace(req.Email))
         return Results.BadRequest(new { error = "L'email és obligatori." });
+    // ForwardedHeaders ha actualitzat Connection.RemoteIpAddress → IP real del client
     var clientIp = ctx.Connection.RemoteIpAddress?.ToString() ?? "";
     var (resp, error) = await svc.CheckinAsync(req, clientIp);
     return error is not null
-        ? Results.NotFound(new { error })
+        ? Results.UnprocessableEntity(new { error })
         : Results.Ok(resp);
 }).RequireRateLimiting("auth");
+
+// ── Sortida voluntària alumne ──────────────────────────────────────────────────
+app.MapPost("/api/examen/sortida", async (IExamenService svc, HttpContext ctx) =>
+{
+    var clientIp = ctx.Connection.RemoteIpAddress?.ToString() ?? "";
+    var (ok, error) = await svc.SortirAsync(clientIp);
+    return ok ? Results.Ok() : Results.NotFound(new { error });
+});
+
+// ── Expulsar alumne (professor) ────────────────────────────────────────────────
+app.MapPost("/api/examen/sessions/{sessioId:int}/alumnes/{studentId:int}/expulsar",
+    async (int sessioId, int studentId, IExamenService svc, ClaimsPrincipal user) =>
+{
+    var profId  = int.Parse(user.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+    var isAdmin = user.FindFirst("IsAdmin")?.Value == "true";
+    var (ok, error) = await svc.ExpulsarAsync(sessioId, studentId, profId, isAdmin);
+    return ok ? Results.Ok() : Results.NotFound(new { error });
+}).RequireAuthorization();
 
 // ── Events DHCP (cridat des del hook del sistema host) ────────────────────────
 app.MapPost("/api/examen/dhcp/event", async (DhcpEventRequest req, IExamenService svc) =>
