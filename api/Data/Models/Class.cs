@@ -1,4 +1,4 @@
-namespace AutoCo.Api.Data.Models;
+namespace EntornExamen.Api.Data.Models;
 
 public class Class
 {
@@ -8,5 +8,4 @@ public class Class
     public DateTime CreatedAt  { get; set; } = DateTime.UtcNow;
 
     public ICollection<Student> Students { get; set; } = [];
-    public ICollection<Module>  Modules  { get; set; } = [];
 }

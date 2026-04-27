@@ -100,7 +100,7 @@
         var result = await Api.LoginProfessorAsync(_email.Trim(), _password);
         _loading = false;
         if (result is null) { _error = Loc["Login_Error_InvalidCredentials"]; return; }
-        await LocalStorage.SetAsync("autoco_session", result);
+        await LocalStorage.SetAsync("entornexamen_session", result);
         UserState.SetLogin(result);
         Nav.NavigateTo("/professor/dashboard");
     }

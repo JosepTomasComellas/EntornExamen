@@ -1,11 +1,11 @@
-using AutoCo.Web;
-using AutoCo.Web.Services;
+using EntornExamen.Web;
+using EntornExamen.Web.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Localization;
 using MudBlazor.Services;
 using StackExchange.Redis;
-using AutoCo.Web.Resources;
+using EntornExamen.Web.Resources;
 
 // Necessari per a ExcelDataReader: suport d'encodings Windows (cp1252, etc.)
 System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
@@ -26,7 +26,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddSignalR()
     .AddStackExchangeRedis(redisConn, opts =>
-        opts.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("AutoCo"));
+        opts.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("EntornExamen"));
 
 builder.Services.AddMudServices();
 
@@ -35,7 +35,7 @@ builder.Services.AddLocalization(opts => opts.ResourcesPath = "Resources");
 
 // Usem DictionaryLocalizer (diccionaris estàtics) en lloc de ResourceManager/resx
 // per evitar problemes de resolució de recursos embeguts en Docker.
-builder.Services.AddSingleton<IStringLocalizer<SharedResources>, AutoCo.Web.Resources.DictionaryLocalizer>();
+builder.Services.AddSingleton<IStringLocalizer<SharedResources>, EntornExamen.Web.Resources.DictionaryLocalizer>();
 
 var supportedCultures = new[] { "ca", "es" };
 builder.Services.Configure<Microsoft.AspNetCore.Builder.RequestLocalizationOptions>(opts =>
@@ -52,14 +52,10 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.RequestLocalizationOptio
 // de cookies d'antiforgery i sessions de ProtectedLocalStorage entre desplegaments.
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new System.IO.DirectoryInfo("/app/dp-keys"))
-    .SetApplicationName("AutoCo");
+    .SetApplicationName("EntornExamen");
 
 // Estat de l'usuari (substitueix ISession + SessionHelper)
 builder.Services.AddScoped<UserStateService>();
-
-// Notificacions de participació en temps real (Redis pub/sub → Blazor)
-builder.Services.AddSingleton<ParticipationNotificationService>();
-builder.Services.AddHostedService<ParticipationRedisSubscriber>();
 
 // ── Entorn Examen: notificacions temps real ────────────────────────────────────
 builder.Services.AddSingleton<ExamenNotificationService>();
@@ -87,7 +83,7 @@ app.UseStaticFiles();
 app.UseRequestLocalization();
 app.UseAntiforgery();
 
-app.MapRazorComponents<AutoCo.Web.Components.App>()
+app.MapRazorComponents<EntornExamen.Web.Components.App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();

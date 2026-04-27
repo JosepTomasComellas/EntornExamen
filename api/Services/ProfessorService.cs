@@ -1,9 +1,9 @@
-using AutoCo.Api.Data;
-using AutoCo.Api.Data.Models;
-using AutoCo.Shared.DTOs;
+using EntornExamen.Api.Data;
+using EntornExamen.Api.Data.Models;
+using EntornExamen.Shared.DTOs;
 using Microsoft.EntityFrameworkCore;
 
-namespace AutoCo.Api.Services;
+namespace EntornExamen.Api.Services;
 
 public interface IProfessorService
 {

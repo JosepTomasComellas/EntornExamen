@@ -11,11 +11,6 @@
 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
     <MudText Typo="Typo.h5">@Loc["Dash_Welcome", UserState.NomComplet ?? ""]</MudText>
     <MudSpacer />
-    <MudButton Variant="Variant.Filled" Color="Color.Primary"
-               StartIcon="@Icons.Material.Filled.Add"
-               Href="/professor/nova-activitat">
-        @Loc["Dash_NewActivity"]
-    </MudButton>
     <MudButton Variant="Variant.Outlined" Color="Color.Primary"
                StartIcon="@Icons.Material.Filled.Class"
                Href="/professor/classes">
@@ -58,194 +53,110 @@
 {
     <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
 }
-else if (!_activities.Any())
-{
-    <MudAlert Severity="Severity.Info">
-        @Loc["Dash_NoActivities"]
-    </MudAlert>
-}
 else
 {
-    <!-- Estadístiques ràpides -->
-    <MudGrid Class="mb-4" Spacing="2">
-        <MudItem xs="6" sm="4">
+    <!-- KPI ràpids -->
+    <MudGrid Class="mb-6" Spacing="2">
+        <MudItem xs="6" sm="3">
             <MudPaper Elevation="1" Class="pa-3 text-center">
                 <MudIcon Icon="@Icons.Material.Filled.Class" Color="Color.Secondary" Size="Size.Small" />
                 <MudText Typo="Typo.h5" Color="Color.Secondary" Style="font-weight:700">@_classesDtos.Count</MudText>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">@Loc["Dash_StatClasses"]</MudText>
             </MudPaper>
         </MudItem>
-        <MudItem xs="6" sm="4">
-            <MudPaper Elevation="1" Class="pa-3 text-center">
-                <MudIcon Icon="@Icons.Material.Filled.MenuBook" Color="Color.Secondary" Size="Size.Small" />
-                <MudText Typo="Typo.h5" Color="Color.Secondary" Style="font-weight:700">@_moduls.Count</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">@Loc["Dash_StatModuls"]</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="6" sm="4">
+        <MudItem xs="6" sm="3">
             <MudPaper Elevation="1" Class="pa-3 text-center">
                 <MudIcon Icon="@Icons.Material.Filled.People" Color="Color.Info" Size="Size.Small" />
                 <MudText Typo="Typo.h5" Color="Color.Info" Style="font-weight:700">@_totalAlumnes</MudText>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">@Loc["Dash_StatStudents"]</MudText>
             </MudPaper>
         </MudItem>
-        <MudItem xs="6" sm="4">
+        <MudItem xs="6" sm="3">
             <MudPaper Elevation="1" Class="pa-3 text-center">
-                <MudIcon Icon="@Icons.Material.Filled.Assignment" Color="Color.Primary" Size="Size.Small" />
-                <MudText Typo="Typo.h5" Color="Color.Primary" Style="font-weight:700">@_activities.Count</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">@Loc["Dash_StatActivities"]</MudText>
+                <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success" Size="Size.Small" />
+                <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight:700">@_sessionsObertes</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Sessions obertes</MudText>
             </MudPaper>
         </MudItem>
-        <MudItem xs="6" sm="4">
+        <MudItem xs="6" sm="3">
             <MudPaper Elevation="1" Class="pa-3 text-center">
-                <MudIcon Icon="@Icons.Material.Filled.LockOpen" Color="Color.Success" Size="Size.Small" />
-                <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight:700">@_activities.Count(a => a.IsOpen)</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">@Loc["Dash_OpenNow"]</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="6" sm="4">
-            <MudPaper Elevation="1" Class="pa-3 text-center">
-                <MudIcon Icon="@Icons.Material.Filled.Group" Color="Color.Warning" Size="Size.Small" />
-                <MudText Typo="Typo.h5" Color="Color.Warning" Style="font-weight:700">@_activities.Sum(a => a.NumGroups)</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">@Loc["Dash_StatGroups"]</MudText>
+                <MudIcon Icon="@Icons.Material.Filled.History" Color="Color.Default" Size="Size.Small" />
+                <MudText Typo="Typo.h5" Style="font-weight:700">@_sessions.Count</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Sessions totals</MudText>
             </MudPaper>
         </MudItem>
     </MudGrid>
 
-    <!-- Filtres -->
-    <MudGrid Class="mb-4" Spacing="2">
-        <MudItem xs="12" sm="6" md="3">
-            <MudTextField @bind-Value="_cerca" Label="@Loc["Dash_SearchActivity"]" Variant="Variant.Outlined"
-                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                          Clearable="true" Immediate="true" Margin="Margin.Dense" />
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudSelect T="int" @bind-Value="_classeId" Label="@Loc["Label_Class"]" AnchorOrigin="Origin.BottomCenter"
-                       Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
-                <MudSelectItem T="int" Value="0">@Loc["Dash_AllClasses"]</MudSelectItem>
-                @foreach (var c in _classes)
-                {
-                    <MudSelectItem T="int" Value="@c.Key">@c.Value</MudSelectItem>
-                }
-            </MudSelect>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudSelect T="int" @bind-Value="_modulId" Label="@Loc["Label_Module"]" AnchorOrigin="Origin.BottomCenter"
-                       Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
-                <MudSelectItem T="int" Value="0">@Loc["Dash_AllModules"]</MudSelectItem>
-                @foreach (var m in _moduls)
-                {
-                    <MudSelectItem T="int" Value="@m.Key">@m.Value</MudSelectItem>
-                }
-            </MudSelect>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3" Class="d-flex align-center gap-3">
-            <MudSwitch @bind-Value="_nomesObertes" Color="Color.Success" Label="@Loc["Dash_OnlyOpen"]" Size="Size.Small" />
-            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                @Loc["Dash_CountOf", _filtrades.Count, _activities.Count]
-            </MudText>
-        </MudItem>
-    </MudGrid>
+    <!-- Accés ràpid a l'Entorn d'Examen -->
+    <MudPaper Elevation="2" Class="pa-4 mb-4"
+              Style="border-left:4px solid var(--mud-palette-error)">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+            <MudIcon Icon="@Icons.Material.Filled.Monitor" Color="Color.Error" Size="Size.Large" />
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.subtitle1" Style="font-weight:700">Entorn d'Examen</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Gestiona sessions d'examen, visualitza connexions en temps real i controla els alumnes connectats.
+                </MudText>
+            </MudStack>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Error"
+                       StartIcon="@Icons.Material.Filled.OpenInNew"
+                       Href="/professor/examen">
+                Obrir
+            </MudButton>
+        </MudStack>
+    </MudPaper>
 
-    @if (!_obertes.Any() && !_tancades.Any())
+    <!-- Últimes sessions -->
+    @if (_sessions.Any())
     {
-        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-            @Loc["Dash_NoMatch"]
-        </MudAlert>
-    }
-
-    @if (_obertes.Any())
-    {
-        <MudText Typo="Typo.subtitle1" Class="mb-3" Style="font-weight:600">
-            <MudIcon Icon="@Icons.Material.Filled.LockOpen" Size="Size.Small"
-                     Color="Color.Success" Class="mr-1" Style="vertical-align:middle" />
-            @Loc["Dash_OpenActivities", _obertes.Count]
+        <MudText Typo="Typo.subtitle1" Style="font-weight:600;margin-bottom:.75rem">
+            Sessions recents
         </MudText>
-        <MudGrid Class="mb-6">
-            @foreach (var act in _obertes)
-            {
-                <MudItem xs="12" sm="6" lg="4">
-                    <ActivityCard Act="act" OnUpdated="OnActUpdated" OnDeleted="OnActDeleted" />
-                </MudItem>
-            }
-        </MudGrid>
-    }
-
-    @if (_tancades.Any())
-    {
-        <MudText Typo="Typo.subtitle1" Class="mb-3"
-                 Style="font-weight:600;color:var(--mud-palette-text-secondary)">
-            <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small"
-                     Color="Color.Default" Class="mr-1" Style="vertical-align:middle" />
-            @Loc["Dash_ClosedActivities", _tancades.Count]
-        </MudText>
-        <MudGrid>
-            @foreach (var act in _tancades)
-            {
-                <MudItem xs="12" sm="6" lg="4">
-                    <ActivityCard Act="act" OnUpdated="OnActUpdated" OnDeleted="OnActDeleted" />
-                </MudItem>
-            }
-        </MudGrid>
+        <MudPaper Elevation="1" Class="pa-0">
+            <MudTable Items="_sessions.Take(5)" Dense="true" Hover="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Títol</MudTh>
+                    <MudTh>Estat</MudTh>
+                    <MudTh>Creada</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@(context.Titol ?? "(sense títol)")</MudTd>
+                    <MudTd>
+                        @if (context.Activa)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">Oberta</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Tancada</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>@context.IniciadaAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
     }
 }
 
 @code {
-    private List<ActivityDto> _activities = [];
-    private List<ClassDto>    _classesDtos = [];
+    private List<ClassDto>          _classesDtos = [];
+    private List<SessioExamenDto>   _sessions    = [];
     private bool _loading = true;
 
-    private string _cerca        = "";
-    private int    _classeId     = 0;
-    private int    _modulId      = 0;
-    private bool   _nomesObertes = false;
-
-    private Dictionary<int, string> _classes = [];
-    private Dictionary<int, string> _moduls  = [];
-    private int _totalAlumnes => _classesDtos.Sum(c => c.NumStudents);
-
-    private List<ActivityDto> _obertes  => _filtrades.Where(a =>  a.IsOpen).ToList();
-    private List<ActivityDto> _tancades => _filtrades.Where(a => !a.IsOpen).ToList();
-
-    private List<ActivityDto> _filtrades => _activities
-        .Where(a => (string.IsNullOrWhiteSpace(_cerca) ||
-                     a.Name.Contains(_cerca, StringComparison.OrdinalIgnoreCase) ||
-                     (a.Description?.Contains(_cerca, StringComparison.OrdinalIgnoreCase) ?? false))
-                 && (_classeId == 0 || a.ClassId == _classeId)
-                 && (_modulId  == 0 || a.ModuleId == _modulId)
-                 && (!_nomesObertes || a.IsOpen))
-        .ToList();
+    private int _totalAlumnes   => _classesDtos.Sum(c => c.NumStudents);
+    private int _sessionsObertes => _sessions.Count(s => s.Activa);
 
     protected override async Task OnInitializedAsync()
     {
         if (!UserState.IsProfessor) return;
         Api.SetToken(UserState.Token!);
-        var activitiesTask = Api.GetActivitiesAsync();
-        var classesTask    = Api.GetClassesAsync();
-        await Task.WhenAll(activitiesTask, classesTask);
-        _activities   = activitiesTask.Result ?? [];
-        _classesDtos  = classesTask.Result    ?? [];
-        _classes = _activities
-            .GroupBy(a => a.ClassId)
-            .ToDictionary(g => g.Key, g => g.First().ClassName +
-                (g.First().ClassAcademicYear is not null ? $" ({g.First().ClassAcademicYear})" : ""));
-        _moduls = _activities
-            .GroupBy(a => a.ModuleId)
-            .ToDictionary(g => g.Key, g => $"{g.First().ModuleCode} – {g.First().ModuleName}");
-        _loading = false;
-    }
-
-    private void OnActUpdated(ActivityDto updated)
-    {
-        var idx = _activities.FindIndex(a => a.Id == updated.Id);
-        if (idx >= 0)
-            _activities[idx] = updated;
-        else
-            _activities.Insert(0, updated); // activitat duplicada nova
-    }
-
-    private void OnActDeleted(ActivityDto deleted)
-    {
-        _activities.RemoveAll(a => a.Id == deleted.Id);
+        var classesTask  = Api.GetClassesAsync();
+        var sessionsTask = Api.GetExamenSessionsAsync();
+        await Task.WhenAll(classesTask, sessionsTask);
+        _classesDtos = classesTask.Result  ?? [];
+        _sessions    = sessionsTask.Result ?? [];
+        _sessions    = [.. _sessions.OrderByDescending(s => s.IniciadaAt)];
+        _loading     = false;
     }
 }

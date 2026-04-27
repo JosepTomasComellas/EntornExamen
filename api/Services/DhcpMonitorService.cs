@@ -1,7 +1,7 @@
-using AutoCo.Shared.DTOs;
+using EntornExamen.Shared.DTOs;
 using System.Text.RegularExpressions;
 
-namespace AutoCo.Api.Services;
+namespace EntornExamen.Api.Services;
 
 /// <summary>
 /// Llegeix /data/dhcpd.leases cada 5 segons i detecta canvis d'estat de les concessions DHCP.

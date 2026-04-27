@@ -1,9 +1,9 @@
-using AutoCo.Api.Data;
-using AutoCo.Api.Data.Models;
-using AutoCo.Shared.DTOs;
+using EntornExamen.Api.Data;
+using EntornExamen.Api.Data.Models;
+using EntornExamen.Shared.DTOs;
 using Microsoft.EntityFrameworkCore;
 
-namespace AutoCo.Api.Services;
+namespace EntornExamen.Api.Services;
 
 public interface IClassService
 {
@@ -19,12 +19,9 @@ public interface IClassService
     Task<bool>              DeleteStudentAsync(int classId, int studentId);
     Task<StudentDto?>       MoveStudentAsync(int classId, int studentId, int targetClassId);
     Task<BulkCreateResult>  BulkAddStudentsAsync(int classId, BulkCreateStudentsRequest req);
-    Task<ResetPasswordResult?> ResetPasswordAsync(int classId, int studentId);
-    Task<SendPasswordResult>   SendPasswordAsync(int classId, int studentId);
-    Task<SendAllResult>        SendAllPasswordsAsync(int classId);
 }
 
-public class ClassService(AppDbContext db, IEmailService email, IWebHostEnvironment env) : IClassService
+public class ClassService(AppDbContext db, IWebHostEnvironment env) : IClassService
 {
     // ── Classes ──────────────────────────────────────────────────────────────
 
@@ -82,15 +79,13 @@ public class ClassService(AppDbContext db, IEmailService email, IWebHostEnvironm
 
     public async Task<StudentDto> AddStudentAsync(int classId, CreateStudentRequest req)
     {
-        var password = PasswordHelper.Generate();
         var student = new Student
         {
-            ClassId      = classId,
-            NumLlista    = req.NumLlista,
-            Nom          = req.Nom.Trim(),
-            Cognoms      = req.Cognoms.Trim(),
-            Email        = req.Email.Trim().ToLower(),
-            PasswordHash = PasswordHelper.Hash(password)
+            ClassId   = classId,
+            NumLlista = req.NumLlista,
+            Nom       = req.Nom.Trim(),
+            Cognoms   = req.Cognoms.Trim(),
+            Email     = req.Email.Trim().ToLower()
         };
         db.Students.Add(student);
         await db.SaveChangesAsync();
@@ -117,13 +112,6 @@ public class ClassService(AppDbContext db, IEmailService email, IWebHostEnvironm
         var targetExists = await db.Classes.AnyAsync(c => c.Id == targetClassId);
         if (!targetExists) return null;
 
-        // Elimina l'alumne de tots els grups (pertanyen a la classe antiga)
-        await db.GroupMembers.Where(gm => gm.StudentId == studentId).ExecuteDeleteAsync();
-        // Elimina avaluacions pendents (FK NoAction)
-        await db.Evaluations
-            .Where(e => e.EvaluatorId == studentId || e.EvaluatedId == studentId)
-            .ExecuteDeleteAsync();
-
         student.ClassId = targetClassId;
         await db.SaveChangesAsync();
         return ToStudentDto(student);
@@ -134,20 +122,6 @@ public class ClassService(AppDbContext db, IEmailService email, IWebHostEnvironm
         var student = await db.Students.FirstOrDefaultAsync(s => s.Id == studentId && s.ClassId == classId);
         if (student is null) return false;
 
-        // Les FK d'Evaluation cap a Student tenen OnDelete.NoAction → cal eliminar manualment.
-        // EvaluationScores en cascade (OnDelete.Cascade) quan s'elimina Evaluation.
-        await db.Evaluations
-            .Where(e => e.EvaluatorId == studentId || e.EvaluatedId == studentId)
-            .ExecuteDeleteAsync();
-
-        await db.GroupMembers
-            .Where(gm => gm.StudentId == studentId)
-            .ExecuteDeleteAsync();
-
-        await db.ModuleExclusions
-            .Where(me => me.StudentId == studentId)
-            .ExecuteDeleteAsync();
-
         db.Students.Remove(student);
         await db.SaveChangesAsync();
         return true;
@@ -157,11 +131,7 @@ public class ClassService(AppDbContext db, IEmailService email, IWebHostEnvironm
     {
         int created = 0, skipped = 0;
         var errors  = new List<string>();
-        var classe  = await db.Classes.FindAsync(classId);
-
-        // Guardem les parelles (estudiant, contrasenya) per enviar correus DESPRÉS de guardar
-        var toEmail   = new List<(Student Student, string Password)>();
-        var batchEmails = new HashSet<string>(); // detecta duplicats dins del mateix CSV
+        var batchEmails = new HashSet<string>();
 
         foreach (var s in req.Students)
         {
@@ -188,18 +158,15 @@ public class ClassService(AppDbContext db, IEmailService email, IWebHostEnvironm
             }
             batchEmails.Add(emailNorm);
 
-            var password = PasswordHelper.Generate();
             var student  = new Student
             {
-                ClassId      = classId,
-                NumLlista    = s.NumLlista,
-                Nom          = s.Nom.Trim(),
-                Cognoms      = s.Cognoms.Trim(),
-                Email        = emailNorm,
-                PasswordHash = PasswordHelper.Hash(password)
+                ClassId   = classId,
+                NumLlista = s.NumLlista,
+                Nom       = s.Nom.Trim(),
+                Cognoms   = s.Cognoms.Trim(),
+                Email     = emailNorm
             };
             db.Students.Add(student);
-            toEmail.Add((student, password));
             created++;
         }
 
@@ -216,62 +183,9 @@ public class ClassService(AppDbContext db, IEmailService email, IWebHostEnvironm
                 return new BulkCreateResult(0, skipped + created, errors);
             }
 
-            // Correus no s'envien automàticament; l'admin pot enviar-los manualment
         }
 
         return new BulkCreateResult(created, skipped, errors);
-    }
-
-    public async Task<ResetPasswordResult?> ResetPasswordAsync(int classId, int studentId)
-    {
-        var student = await db.Students.FirstOrDefaultAsync(s => s.Id == studentId && s.ClassId == classId);
-        if (student is null) return null;
-        var newPassword = PasswordHelper.Generate();
-        student.PasswordHash = PasswordHelper.Hash(newPassword);
-        await db.SaveChangesAsync();
-        return new ResetPasswordResult(newPassword);
-    }
-
-    public async Task<SendPasswordResult> SendPasswordAsync(int classId, int studentId)
-    {
-        var student = await db.Students.Include(s => s.Class)
-            .FirstOrDefaultAsync(s => s.Id == studentId && s.ClassId == classId);
-        if (student is null) return new SendPasswordResult(false, "Alumne no trobat.");
-        if (!email.IsEnabled) return new SendPasswordResult(false, "Correu no configurat.");
-
-        var newPassword = PasswordHelper.Generate();
-        student.PasswordHash = PasswordHelper.Hash(newPassword);
-        await db.SaveChangesAsync();
-
-        var sent = await email.SendStudentPasswordAsync(student.Email, student.NomComplet,
-            student.Class.Name, newPassword);
-        return new SendPasswordResult(sent, sent ? null : "Error en l'enviament.");
-    }
-
-    public async Task<SendAllResult> SendAllPasswordsAsync(int classId)
-    {
-        var students = await db.Students.Include(s => s.Class)
-            .Where(s => s.ClassId == classId).ToListAsync();
-        int sent = 0, skipped = 0;
-        var details = new List<string>();
-
-        // Genera i desa tots els nous passwords d'un sol cop (evita N+1 SaveChanges)
-        var passwords = new Dictionary<int, string>(students.Count);
-        foreach (var s in students)
-        {
-            var newPassword = PasswordHelper.Generate();
-            s.PasswordHash = PasswordHelper.Hash(newPassword);
-            passwords[s.Id] = newPassword;
-        }
-        await db.SaveChangesAsync();
-
-        foreach (var s in students)
-        {
-            if (!email.IsEnabled) { skipped++; continue; }
-            var ok = await email.SendStudentPasswordAsync(s.Email, s.NomComplet, s.Class.Name, passwords[s.Id]);
-            if (ok) sent++; else { skipped++; details.Add($"{s.NomComplet}: error."); }
-        }
-        return new SendAllResult(sent, skipped, details);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

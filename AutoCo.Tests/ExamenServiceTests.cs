@@ -1,13 +1,13 @@
-using AutoCo.Api.Data;
-using AutoCo.Api.Data.Models;
-using AutoCo.Api.Hubs;
-using AutoCo.Api.Services;
-using AutoCo.Shared.DTOs;
+using EntornExamen.Api.Data;
+using EntornExamen.Api.Data.Models;
+using EntornExamen.Api.Hubs;
+using EntornExamen.Api.Services;
+using EntornExamen.Shared.DTOs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using StackExchange.Redis;
 
-namespace AutoCo.Tests;
+namespace EntornExamen.Tests;
 
 /// <summary>
 /// Tests unitaris d'ExamenService.

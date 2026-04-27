@@ -244,8 +244,7 @@
             if (result?.Success == true)
             {
                 Snackbar.Add(
-                    Loc["Backup_ImportOk", result.Professors, result.Classes, result.Students,
-                        result.Activities, result.Evaluations].Value,
+                    Loc["Backup_ImportOk", result.Professors, result.Classes, result.Students].Value,
                     Severity.Success);
                 _importFile = null;
             }
@@ -297,8 +296,7 @@
         var result = await Api.RestoreBackupFileAsync(name);
         if (result?.Success == true)
             Snackbar.Add(
-                Loc["Backup_RestoreOk", result.Professors, result.Classes, result.Students,
-                    result.Activities, result.Evaluations].Value,
+                Loc["Backup_RestoreOk", result.Professors, result.Classes, result.Students].Value,
                 Severity.Success);
         else
             Snackbar.Add(Loc["Backup_RestoreError", result?.Error ?? "desconegut"].Value, Severity.Error);

@@ -30,14 +30,6 @@
         }
     </MudStack>
     <MudSpacer />
-    @if (UserState.IsAdmin)
-    {
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Email"
-                   OnClick="SendAllAsync">
-            @Loc["ClassStudents_SendAll"]
-        </MudButton>
-    }
     <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
                StartIcon="@Icons.Material.Filled.Download"
                OnClick="ExportCsvAsync">
@@ -284,18 +276,6 @@
                 <MudSpacer />
                 <MudButton Variant="Variant.Filled" Size="Size.Small" Disabled="_saving"
                            Style="background:rgba(255,255,255,.2);color:white"
-                           StartIcon="@Icons.Material.Filled.Email"
-                           OnClick="BulkSendPasswordsAsync">
-                    @Loc["ClassStudents_SendPwd"]
-                </MudButton>
-                <MudButton Variant="Variant.Filled" Size="Size.Small" Disabled="_saving"
-                           Style="background:rgba(255,255,255,.2);color:white"
-                           StartIcon="@Icons.Material.Filled.Key"
-                           OnClick="BulkResetPasswordsAsync">
-                    @Loc["ClassStudents_ResetPwd"]
-                </MudButton>
-                <MudButton Variant="Variant.Filled" Size="Size.Small" Disabled="_saving"
-                           Style="background:rgba(255,255,255,.2);color:white"
                            StartIcon="@Icons.Material.Filled.DriveFileMove"
                            OnClick="BulkMoveAsync">
                     @Loc["ClassStudents_MoveBtn"]
@@ -374,12 +354,6 @@
                             <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                            Color="Color.Primary" title="Editar"
                                            OnClick="() => StartEdit(context.Item)" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Email" Size="Size.Small"
-                                           Color="Color.Secondary" title="Enviar contrasenya"
-                                           OnClick="() => SendPasswordAsync(context.Item)" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Key" Size="Size.Small"
-                                           Color="Color.Warning" title="Generar nova contrasenya"
-                                           OnClick="() => ResetPasswordAsync(context.Item)" />
                             <MudIconButton Icon="@Icons.Material.Filled.DriveFileMove" Size="Size.Small"
                                            Color="Color.Info" title="Moure a una altra classe"
                                            OnClick="() => MoveOneAsync(context.Item)" />
@@ -437,52 +411,6 @@
     {
         if (selectAll) _selected = [.. _students.Select(s => s.Id)];
         else           _selected.Clear();
-    }
-
-    private async Task BulkSendPasswordsAsync()
-    {
-        if (!_selected.Any()) return;
-        var ids = _selected.ToList();
-        var confirm = await Dialog.ShowMessageBox(Loc["ClassStudents_SendPwd"].Value,
-            $"S'enviarà la contrasenya per correu a {ids.Count} alumne{(ids.Count != 1 ? "s" : "")}.",
-            yesText: Loc["Action_Send"].Value, cancelText: Loc["Action_Cancel"].Value);
-        if (confirm != true) return;
-
-        _saving = true;
-        Api.SetToken(UserState.Token!);
-        int sent = 0, failed = 0;
-        foreach (var id in ids)
-        {
-            var r = await Api.SendPasswordAsync(ClassId, id);
-            if (r?.Sent == true) sent++; else failed++;
-        }
-        Snackbar.Add($"Enviades: {sent}{(failed > 0 ? $" · Fallades: {failed}" : "")}",
-            failed > 0 ? Severity.Warning : Severity.Success);
-        _selected.Clear();
-        _saving = false;
-    }
-
-    private async Task BulkResetPasswordsAsync()
-    {
-        if (!_selected.Any()) return;
-        var ids = _selected.ToList();
-        var confirm = await Dialog.ShowMessageBox(Loc["ClassStudents_ResetPwd"].Value,
-            $"Es generarà una nova contrasenya per a {ids.Count} alumne{(ids.Count != 1 ? "s" : "")}. Les contrasenyes anteriors quedaran invàlides.",
-            yesText: Loc["Action_Confirm"].Value, cancelText: Loc["Action_Cancel"].Value);
-        if (confirm != true) return;
-
-        _saving = true;
-        Api.SetToken(UserState.Token!);
-        int ok = 0, failed = 0;
-        foreach (var id in ids)
-        {
-            var r = await Api.ResetPasswordAsync(ClassId, id);
-            if (r is not null) ok++; else failed++;
-        }
-        Snackbar.Add($"Contrasenyes generades: {ok}{(failed > 0 ? $" · Errors: {failed}" : "")}",
-            failed > 0 ? Severity.Warning : Severity.Success);
-        _selected.Clear();
-        _saving = false;
     }
 
     private async Task BulkDeleteAsync()
@@ -988,38 +916,6 @@
     {
         var color = _avatarColors[s.NumLlista % _avatarColors.Length];
         return $"background:{color};color:white;font-size:0.68rem;width:28px;height:28px;min-width:28px";
-    }
-
-    private async Task SendPasswordAsync(StudentDto s)
-    {
-        Api.SetToken(UserState.Token!);
-        var result = await Api.SendPasswordAsync(ClassId, s.Id);
-        if (result?.Sent == true) Snackbar.Add("Contrasenya enviada.", Severity.Success);
-        else Snackbar.Add($"No s'ha pogut enviar: {result?.Reason}", Severity.Error);
-    }
-
-    private async Task SendAllAsync()
-    {
-        var confirm = await Dialog.ShowMessageBox("Confirmar",
-            "Enviar nova contrasenya a tots els alumnes?",
-            yesText: "Enviar", cancelText: "Cancel·lar");
-        if (confirm != true) return;
-        Api.SetToken(UserState.Token!);
-        var result = await Api.SendAllPasswordsAsync(ClassId);
-        if (result is not null)
-            Snackbar.Add($"Enviades: {result.Sent} · Omeses: {result.Skipped}", Severity.Success);
-    }
-
-    private async Task ResetPasswordAsync(StudentDto s)
-    {
-        var confirm = await Dialog.ShowMessageBox("Confirmar",
-            $"Generar nova contrasenya per a «{s.NomComplet}»?",
-            yesText: "Confirmar", cancelText: "Cancel·lar");
-        if (confirm != true) return;
-        Api.SetToken(UserState.Token!);
-        var result = await Api.ResetPasswordAsync(ClassId, s.Id);
-        if (result is not null)
-            Snackbar.Add($"Nova contrasenya generada per a {s.NomComplet}. Comunica-la per un canal segur.", Severity.Success);
     }
 
     private async Task DeleteAsync(StudentDto s)

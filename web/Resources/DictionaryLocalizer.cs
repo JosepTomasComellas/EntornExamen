@@ -1,7 +1,7 @@
 using System.Globalization;
 using Microsoft.Extensions.Localization;
 
-namespace AutoCo.Web.Resources;
+namespace EntornExamen.Web.Resources;
 
 /// <summary>
 /// Localitzador basat en diccionaris estàtics. Bypassa completament ResourceManager

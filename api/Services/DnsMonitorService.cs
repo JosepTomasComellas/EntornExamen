@@ -1,7 +1,7 @@
-using AutoCo.Shared.DTOs;
+using EntornExamen.Shared.DTOs;
 using System.Text.RegularExpressions;
 
-namespace AutoCo.Api.Services;
+namespace EntornExamen.Api.Services;
 
 /// <summary>
 /// Observa /data/dns-queries.log amb FileSystemWatcher i parseja noves línies.

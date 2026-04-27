@@ -1,4 +1,4 @@
-namespace AutoCo.Api.Data;
+namespace EntornExamen.Api.Data;
 
 /// <summary>Criteris d'avaluació fixes per a totes les activitats.</summary>
 public static class Criteria

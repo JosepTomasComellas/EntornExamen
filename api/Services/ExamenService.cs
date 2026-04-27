@@ -1,14 +1,14 @@
-using AutoCo.Api.Data;
-using AutoCo.Api.Data.Models;
-using AutoCo.Api.Hubs;
-using AutoCo.Shared.DTOs;
+using EntornExamen.Api.Data;
+using EntornExamen.Api.Data.Models;
+using EntornExamen.Api.Hubs;
+using EntornExamen.Shared.DTOs;
 using ExcelDataReader;
 using Microsoft.EntityFrameworkCore;
 using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace AutoCo.Api.Services;
+namespace EntornExamen.Api.Services;
 
 public interface IExamenService
 {
@@ -19,7 +19,7 @@ public interface IExamenService
     Task<(bool Ok, string? Error)> ReobrirSessioAsync(int sessioId, int professorId, bool isAdmin);
     Task<(bool Ok, string? Error)> SetMissatgeAsync(int sessioId, string? text, int professorId, bool isAdmin);
     Task<(byte[] Content, string FileName)?> ExportarCsvAsync(int sessioId, int professorId, bool isAdmin);
-    Task<(CheckinResponse? Resp, string? Error)> CheckinAsync(CheckinRequest req);
+    Task<(CheckinResponse? Resp, string? Error)> CheckinAsync(CheckinRequest req, string clientIp);
     Task ProcessDhcpEventAsync(DhcpEventRequest req);
     Task ProcessDnsEventAsync(DnsEventRequest req);
     Task<(ImportacioAlumnesResult Result, string? Error)> ImportarAlumnesAsync(Stream htmlStream, int professorId, bool isAdmin);
@@ -284,18 +284,14 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
 
     // ─── Check-in alumne ──────────────────────────────────────────────────────
 
-    public async Task<(CheckinResponse? Resp, string? Error)> CheckinAsync(CheckinRequest req)
+    public async Task<(CheckinResponse? Resp, string? Error)> CheckinAsync(CheckinRequest req, string clientIp)
     {
-        var domini = config["Examen:DominiEmail"] ?? "sarria.salesians.cat";
-        if (!req.Email.EndsWith($"@{domini}", StringComparison.OrdinalIgnoreCase))
-            return (null, $"L'email ha d'acabar en @{domini}.");
-
-        var mac = NormalitzaMac(req.Mac);
+        var emailNorm = req.Email.Trim().ToLower();
 
         var student = await db.Students
             .Include(s => s.Class)
             .Include(s => s.Macs)
-            .FirstOrDefaultAsync(s => s.Email.ToLower() == req.Email.Trim().ToLower());
+            .FirstOrDefaultAsync(s => s.Email.ToLower() == emailNorm);
 
         if (student is null)
             return (null, "Email no reconegut al sistema.");
@@ -307,47 +303,55 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         if (sessio is null)
             return (null, "No hi ha examen actiu per a la teva classe.");
 
-        // Associa MAC si no existia
-        if (!student.Macs.Any(m => m.Mac == mac))
-        {
-            db.AlumneMacs.Add(new AlumneMac
-            {
-                StudentId    = student.Id,
-                Mac          = mac,
-                PrimerCopVist = DateTime.UtcNow
-            });
-        }
-
-        // Crea o actualitza RegistreConnexio
-        var registre = await db.RegistresConnexio
-            .FirstOrDefaultAsync(r => r.SessioId == sessio.Id && r.StudentId == student.Id);
-
         var ara = DateTime.UtcNow;
-        if (registre is null)
+
+        // Busca el registre de connexió per IP (assignada per DHCP) o per alumne ja identificat
+        var registre = await db.RegistresConnexio
+            .FirstOrDefaultAsync(r => r.SessioId == sessio.Id &&
+                (r.StudentId == student.Id ||
+                 (!string.IsNullOrEmpty(clientIp) && r.IpAssignada == clientIp)));
+
+        string mac = "";
+        if (registre is not null)
         {
+            // Identifica l'alumne en el registre existent
+            registre.StudentId      = student.Id;
+            registre.UltimCheckinAt = ara;
+            registre.Estat          = EstatConnexio.Connectat;
+            mac = registre.MacAddress;
+
+            // Associa MAC a l'alumne si no existia
+            if (!string.IsNullOrEmpty(mac) && !student.Macs.Any(m => m.Mac == mac))
+            {
+                db.AlumneMacs.Add(new AlumneMac
+                {
+                    StudentId     = student.Id,
+                    Mac           = mac,
+                    PrimerCopVist = ara
+                });
+            }
+        }
+        else
+        {
+            // Crea un registre manual (sense DHCP conegut)
             registre = new RegistreConnexio
             {
                 SessioId       = sessio.Id,
                 StudentId      = student.Id,
-                MacAddress     = mac,
+                MacAddress     = clientIp,   // Sense MAC disponible, usem la IP com a identificador
+                IpAssignada    = clientIp,
                 ConnectatAt    = ara,
                 UltimCheckinAt = ara,
                 Estat          = EstatConnexio.Connectat
             };
             db.RegistresConnexio.Add(registre);
         }
-        else
-        {
-            registre.MacAddress     = mac;
-            registre.UltimCheckinAt = ara;
-            registre.Estat          = EstatConnexio.Connectat;
-        }
 
         await db.SaveChangesAsync();
 
         // Notifica el professor
         _ = hub.NotificaNouCheckinAsync(sessio.Id, new ExamenEventAlumne(
-            student.Id, student.Nom, student.Cognoms, null, mac, ara));
+            student.Id, student.Nom, student.Cognoms, clientIp, mac, ara));
 
         var interval = int.TryParse(config["Examen:CheckinIntervalSeconds"], out var iv) ? iv : 30;
         return (new CheckinResponse(
@@ -532,7 +536,7 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                         Email        = email,
                         NumLlista    = fila.NumLlista,
                         Dni          = fila.Dni?.Trim(),
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(PasswordHelper.Generate())
+                        PasswordHash = null
                     };
                     db.Students.Add(student);
                     importats++;
@@ -712,7 +716,7 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                         Email        = email,
                         NumLlista    = num,
                         Dni          = string.IsNullOrWhiteSpace(dni) ? null : dni,
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(PasswordHelper.Generate())
+                        PasswordHash = null
                     });
                     importats++;
                 }

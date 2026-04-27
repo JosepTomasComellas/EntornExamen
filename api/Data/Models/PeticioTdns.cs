@@ -1,4 +1,4 @@
-namespace AutoCo.Api.Data.Models;
+namespace EntornExamen.Api.Data.Models;
 
 public class PeticioTdns
 {

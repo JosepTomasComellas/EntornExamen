@@ -50,13 +50,6 @@ else
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Professors actius (≥1 accés / 30d)</MudText>
             </MudPaper>
         </MudItem>
-        <MudItem xs="12" sm="4">
-            <MudPaper Elevation="2" Class="pa-4 text-center">
-                <MudIcon Icon="@Icons.Material.Filled.Assignment" Color="Color.Info" Size="Size.Medium" />
-                <MudText Typo="Typo.h4" Style="font-weight:700;margin-top:.25rem">@_totalActivities30</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">Activitats creades últims 30 dies</MudText>
-            </MudPaper>
-        </MudItem>
     </MudGrid>
 
     <!-- Taula per professor -->
@@ -69,8 +62,6 @@ else
             <HeaderContent>
                 <MudTh><MudTableSortLabel SortBy="new Func<ProfessorStatsDto,object>(x=>x.NomComplet)">Professor</MudTableSortLabel></MudTh>
                 <MudTh Style="text-align:center"><MudTableSortLabel SortBy="new Func<ProfessorStatsDto,object>(x=>x.LoginsLast30)">Accessos (30d)</MudTableSortLabel></MudTh>
-                <MudTh Style="text-align:center"><MudTableSortLabel SortBy="new Func<ProfessorStatsDto,object>(x=>x.TotalActivities)">Activitats</MudTableSortLabel></MudTh>
-                <MudTh Style="text-align:center"><MudTableSortLabel SortBy="new Func<ProfessorStatsDto,object>(x=>x.AvgParticipation)">Part. mitjana</MudTableSortLabel></MudTh>
                 <MudTh Style="text-align:center"><MudTableSortLabel SortBy="new Func<ProfessorStatsDto,object>(x=>x.LastAccess ?? DateTime.MinValue)">Darrer accés</MudTableSortLabel></MudTh>
             </HeaderContent>
             <RowTemplate>
@@ -86,19 +77,6 @@ else
                 </MudTd>
                 <MudTd Style="text-align:center">
                     <span class="@LoginClass(context.LoginsLast30)">@context.LoginsLast30</span>
-                </MudTd>
-                <MudTd Style="text-align:center">@context.TotalActivities</MudTd>
-                <MudTd Style="text-align:center">
-                    @if (context.TotalActivities == 0)
-                    {
-                        <span style="color:var(--mud-palette-text-secondary)">—</span>
-                    }
-                    else
-                    {
-                        <span class="@ParticipationClass(context.AvgParticipation)">
-                            @context.AvgParticipation.ToString("F1")%
-                        </span>
-                    }
                 </MudTd>
                 <MudTd Style="text-align:center">
                     @if (context.LastAccess is null)
@@ -132,9 +110,6 @@ else
 
     private int _totalLogins30    => _stats?.Professors.Sum(p => p.LoginsLast30) ?? 0;
     private int _activeProfessors => _stats?.Professors.Count(p => p.LoginsLast30 > 0) ?? 0;
-    private int _totalActivities30 => _stats?.MonthlyActivities
-        .Where(m => new DateTime(m.Year, m.Month, 1) >= DateTime.UtcNow.AddDays(-30))
-        .Sum(m => m.Count) ?? 0;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -188,16 +163,10 @@ else
                     .FirstOrDefault(l => l.Year == m.Year && l.Month == m.Month)?.Count ?? 0))
                 .ToArray();
 
-            var activityData = months
-                .Select(m => (double?)(_stats.MonthlyActivities
-                    .FirstOrDefault(a => a.Year == m.Year && a.Month == m.Month)?.Count ?? 0))
-                .ToArray();
-
             await JS.InvokeVoidAsync("autocoCharts.renderBar", "chart-monthly", labels,
                 new[]
                 {
-                    new { label = "Accessos professors", data = loginData,    color = "#1d4ed8" },
-                    new { label = "Activitats creades",  data = activityData, color = "#CC0000" }
+                    new { label = "Accessos professors", data = loginData, color = "#1d4ed8" }
                 });
 
             _chartDrawn = true;

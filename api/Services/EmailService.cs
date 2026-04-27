@@ -2,7 +2,7 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
 
-namespace AutoCo.Api.Services;
+namespace EntornExamen.Api.Services;
 
 public interface IEmailService
 {

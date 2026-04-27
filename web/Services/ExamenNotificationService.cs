@@ -1,7 +1,7 @@
-using AutoCo.Shared.DTOs;
+using EntornExamen.Shared.DTOs;
 using System.Collections.Concurrent;
 
-namespace AutoCo.Web.Services;
+namespace EntornExamen.Web.Services;
 
 /// <summary>
 /// Bus intern de notificacions de l'Entorn Examen.

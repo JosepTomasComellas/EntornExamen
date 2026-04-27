@@ -1,8 +1,8 @@
-using AutoCo.Shared.DTOs;
+using EntornExamen.Shared.DTOs;
 using StackExchange.Redis;
 using System.Text.Json;
 
-namespace AutoCo.Web.Services;
+namespace EntornExamen.Web.Services;
 
 /// <summary>
 /// Subscriu canals Redis de l'Entorn Examen i delega les notificacions

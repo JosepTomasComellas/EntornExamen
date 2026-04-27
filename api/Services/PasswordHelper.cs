@@ -1,4 +1,4 @@
-namespace AutoCo.Api.Services;
+namespace EntornExamen.Api.Services;
 
 public static class PasswordHelper
 {

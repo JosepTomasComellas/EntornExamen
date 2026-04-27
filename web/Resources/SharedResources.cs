@@ -1,4 +1,4 @@
-namespace AutoCo.Web;
+namespace EntornExamen.Web;
 
 /// <summary>
 /// Classe marcadora per a IStringLocalizer&lt;SharedResources&gt;.

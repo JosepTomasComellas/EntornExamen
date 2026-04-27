@@ -1,7 +1,7 @@
-using AutoCo.Api.Data.Models;
+using EntornExamen.Api.Data.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace AutoCo.Api.Data;
+namespace EntornExamen.Api.Data;
 
 public static class SeedData
 {

@@ -153,7 +153,7 @@
     {
         await InvokeAsync(async () =>
         {
-            try { await LocalStorage.DeleteAsync("autoco_session"); } catch { }
+            try { await LocalStorage.DeleteAsync("entornexamen_session"); } catch { }
             Nav.NavigateTo("/", forceLoad: false);
         });
     }
@@ -216,11 +216,11 @@
         {
             if (!UserState.IsLoggedIn)
             {
-                var stored = await LocalStorage.GetAsync<LoginResponse>("autoco_session");
+                var stored = await LocalStorage.GetAsync<LoginResponse>("entornexamen_session");
                 if (stored.Success && stored.Value is not null)
                 {
                     if (IsTokenExpired(stored.Value.Token))
-                        await LocalStorage.DeleteAsync("autoco_session"); // token caducat → neteja
+                        await LocalStorage.DeleteAsync("entornexamen_session"); // token caducat → neteja
                     else
                         UserState.SetLogin(stored.Value);
                 }
@@ -230,14 +230,14 @@
 
         try
         {
-            var dm = await LocalStorage.GetAsync<bool>("autoco_darkmode");
+            var dm = await LocalStorage.GetAsync<bool>("entornexamen_darkmode");
             if (dm.Success) _darkMode = dm.Value;
         }
         catch { }
 
         try
         {
-            var col = await LocalStorage.GetAsync<string>("autoco_color");
+            var col = await LocalStorage.GetAsync<string>("entornexamen_color");
             if (col.Success && !string.IsNullOrWhiteSpace(col.Value))
                 _primaryColor = col.Value;
         }
@@ -252,14 +252,14 @@
     private async Task ToggleDarkMode()
     {
         _darkMode = !_darkMode;
-        await LocalStorage.SetAsync("autoco_darkmode", _darkMode);
+        await LocalStorage.SetAsync("entornexamen_darkmode", _darkMode);
     }
 
     private async Task ChangeColorAsync(string hex)
     {
         _primaryColor = hex;
         ApplyColor(hex);
-        await LocalStorage.SetAsync("autoco_color", hex);
+        await LocalStorage.SetAsync("entornexamen_color", hex);
     }
 
     private void ApplyColor(string hex)
@@ -290,7 +290,7 @@
 
     private async Task Logout()
     {
-        try { await LocalStorage.DeleteAsync("autoco_session"); } catch { }
+        try { await LocalStorage.DeleteAsync("entornexamen_session"); } catch { }
         UserState.Logout();
         Nav.NavigateTo("/", forceLoad: false);
     }

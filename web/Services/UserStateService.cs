@@ -1,6 +1,6 @@
-using AutoCo.Shared.DTOs;
+using EntornExamen.Shared.DTOs;
 
-namespace AutoCo.Web.Services;
+namespace EntornExamen.Web.Services;
 
 /// <summary>
 /// Servei Scoped que guarda l'estat de sessió de l'usuari per al circuit Blazor.

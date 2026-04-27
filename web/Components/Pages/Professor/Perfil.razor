@@ -152,7 +152,7 @@
             // Actualitza la sessió amb el nou nom
             var session = new LoginResponse(UserState.Token!, result.NomComplet,
                 UserState.Role!, result.Id);
-            try { await LocalStorage.SetAsync("autoco_session", session); } catch { }
+            try { await LocalStorage.SetAsync("entornexamen_session", session); } catch { }
             UserState.SetLogin(session);
 
             _nom     = result.Nom;
