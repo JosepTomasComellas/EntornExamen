@@ -92,12 +92,12 @@ using (var scope = app.Services.CreateScope())
 {
     var db     = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-    db.Database.Migrate();
+    db.Database.EnsureCreated();
 
     // ── Taules afegides al model sense migració formal (crea si no existeix) ──
-    // Idempotent: segur d'executar a cada arrencada. Necessari quan el projecte
-    // no té fitxers de migració i la BD va ser creada amb EnsureCreated o bé
-    // amb una versió anterior del model.
+    // Idempotent: segur d'executar a cada arrencada. EnsureCreated crea les taules
+    // base si la BD no existeix; aquest bloc afegeix les taules noves a BD ja
+    // existents (actualitzacions) sense necessitat de fitxers de migració EF Core.
     await db.Database.ExecuteSqlRawAsync("""
         IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'ActivityCriteria')
         BEGIN
