@@ -1,0 +1,420 @@
+/*
+  The original subVereor Theme for phpBB version 2.0.x
+  Created by Vereor design
+  http://www.vereor.com
+*/
+
+@import url("formie.css");
+
+.ma              { cursor:hand; }
+
+a:link,a:active,a:visited {
+        color: #445395;
+        text-decoration: none;
+}
+
+a:hover                {
+        color: #E35000;
+        text-decoration: none;
+}
+
+a.cat                {
+        color: #445395;
+        text-decoration: none;
+        font-size: 10px;
+}
+
+
+a.catpru                {
+        color: #0000FF;
+        text-decoration: none;
+        font-size: 10px;
+}
+
+
+
+a.cat:hover{
+        color: black;
+        text-decoration: none;
+}
+
+a.cat2                {
+        color: #445395;
+        text-decoration: none;
+        font-size: 14px;
+}
+
+a.cat2:hover{
+        color: black;
+        text-decoration: none;
+}
+
+a.cat3                {
+        color: white;
+        text-decoration: none;
+        font-size: 14px;
+}
+
+a.cat3:hover{
+        color: black;
+        text-decoration: none;
+}
+
+
+
+a.copyright                {
+        color: #444444;
+        text-decoration: none;
+}
+
+a.copyright:hover {
+        color: #000000;
+        text-decoration: none;
+}
+
+a.forumlink         {
+        color: #445395;
+        text-decoration: none;
+}
+
+a.forumlink:hover{
+        color: #E35000;
+        text-decoration: none;
+}
+
+a.gen,a.genmed,a.gensmall {
+        color: #445395;
+        text-decoration: none;
+}
+
+a.gen:hover,a.genmed:hover,a.gensmall:hover        {
+        color: #E35000;
+        text-decoration: none;
+}
+
+a.mainmenu                {
+        color: #445395;
+        text-decoration: none;
+}
+
+a.mainmenu:hover{
+        color: #E35000;
+        text-decoration: none;
+}
+
+a.nav                        {
+        color: #445395;
+        text-decoration: none;
+}
+
+a.nav:hover                {
+        text-decoration: none;
+}
+
+a.postlink:link        {
+        color: #445395;
+        text-decoration: none;
+}
+
+a.postlink:visited {
+        color: #445395;
+        text-decoration: none;
+}
+
+a.postlink:hover {
+        color: #E35000;
+        text-decoration: none;
+}
+
+a.topictitle:link {
+        color: #445395;
+        text-decoration: none;
+}
+
+a.topictitle:visited {
+        color: #5493B4;
+        text-decoration: none;
+}
+
+a.topictitle:hover        {
+        color: #E35000;
+        text-decoration: none;
+}
+
+body {
+        scrollbar-face-color: #DEE3E7;
+}
+
+font,th,td,p {
+        font-family: Verdana, Arial, Helvetica, sans-serif;
+        font-size: 11px;
+}
+
+hr        {
+        border: solid #D1D7DC 0px;
+        border-top-width: 1px;
+        height: 0px;
+}
+
+input {
+        text-indent: 2px;
+}
+
+input,textarea, select {
+        border-color: #000000;
+        color: #000000;
+        font: normal 11px Verdana, Arial, Helvetica, sans-serif;
+}
+
+input.button {
+        background-color: #EFEFEF;
+        color: #000000;
+        font-family: Verdana, Arial, Helvetica, sans-serif;
+        font-size: 11px;
+}
+
+input.liteoption {
+        background-color: #FAFAFA;
+        font-weight: normal;
+}
+
+input.mainoption {
+        background-color: #FAFAFA;
+        font-weight: bold;
+}
+
+input.post, textarea.post, select {
+        background-color: #FFFFFF;
+}
+
+input.post1 {
+        background-color: #FFFFFF;
+        border: 1 px
+}
+
+
+td.cat, th.cat {
+        background-image: url(../dibus/cellpic2.gif);
+        padding: 3px;
+        height: 25px;
+}
+
+td.row1        {
+        background: url(../dibus/_row1.gif);
+        background-repeat: repeat-x;
+        background-color: #F5F5F5;
+}
+
+td.row2        {
+        background: url(../dibus/_row2.gif);
+        background-repeat: repeat-x;
+        background-color: #ECEDF3;
+}
+
+td.pro        {
+      border: 1px solid #000000;
+}
+
+td.pro1       {
+      border: 1px solid #000000;
+      border-right: 1px dashed blue;
+}
+
+td.pro2       {
+      border: 1px solid #000000;
+      border-left: 1px dashed blue;
+}
+
+
+td.spacerow {
+        background-image: url(../dibus/cellpic1.gif);
+        height: 4px;
+}
+
+td.rowpic {
+        background-color: #FFFFFF;
+        background-image: url(../dibus/cellpic3.gif);
+        background-repeat: repeat-y;
+}
+
+th        {
+        background-color: #445395;
+        background-image: url(../dibus/cellpic1.gif);
+        color: #F1F1F1;
+        font-size: 11px;
+        font-weight: bold;
+        height: 25px;
+}
+
+.bodyline        {
+        background-color: #FFFFFF;
+        border: 1px #98AAB1 solid;
+}
+
+.cat                {
+        color: #FFFFFF;
+        font-size: 12px;
+        font-weight: bold;
+}
+
+.cat2                {
+        color: #445395;
+        font-size: 14px;
+        font-weight: bold;
+}
+
+.cat3                {
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+}
+
+
+.code {
+        background-color: #FAFAFA;
+        border: #D1D7DC;
+        border-bottom-width: 1px;
+        border-left-width: 1px;
+        border-right-width: 1px;
+        border-style: solid;
+        border-top-width: 1px;
+        color: #006600;
+        font-family: Courier, 'Courier New', sans-serif;
+        font-size: 11px;
+}
+
+.copyright                {
+        color: #444444;
+        font-family: Verdana, Arial, Helvetica, sans-serif;
+        font-size: 10px;
+        letter-spacing: -1px;
+}
+
+.forumline        {
+        background-color: #FFFFFF;
+        border: 2px #D0D5E7 solid;
+}
+
+.forumlink                {
+        color: #445395;
+        font-size: 12px;
+        font-weight: bold;
+}
+
+.gen {
+        font-size: 12px;
+}
+
+.gen,.genmed,.gensmall {
+        color: #000000;
+}
+
+.genmed {
+        font-size: 11px;
+}
+
+.gensmall {
+        font-size: 10px;
+}
+
+.helpline {
+        background-color: #DEE3E7;
+        border-style: none;
+}
+
+.mainbody {
+        padding: 9px;
+}
+
+.mainmenu                {
+        color: #000000;
+        font-size: 11px;
+}
+
+.maintitle,h1,h2        {
+        color: #000000;
+        font-family: "Trebuchet MS",Verdana, Arial, Helvetica, sans-serif;
+        font-size: 22px;
+        font-weight: bold;
+        line-height: 120%;
+        text-decoration: none;
+}
+
+.name                        {
+        color: #000000;
+        font-size: 11px;
+}
+
+.nav                        {
+        color: #000000;
+        font-size: 11px;
+        font-weight: bold;
+}
+
+.postbody {
+        font-size: 12px;
+}
+
+.postdetails                {
+        color: #000000;
+        font-size: 10px;
+}
+
+.quote {
+        background-color: #FAFAFA;
+        border: #D1D7DC;
+        border-bottom-width: 1px;
+        border-left-width: 1px;
+        border-right-width: 1px;
+        border-style: solid;
+        border-top-width: 1px;
+        color: #444444;
+        font-family: Verdana, Arial, Helvetica, sans-serif;
+        font-size: 11px;
+        line-height: 125%;
+}
+
+.topictitle                        {
+        color: #000000;
+        font-size: 11px;
+        font-weight: bold;
+}
+
+
+table.menu
+{
+        position: absolute;
+        border: 1px solid black;
+        cursor: hand;
+        visibility: hidden;
+        background-image: url(../dibus/_row2.gif); /* Must be the same as tdBgColor in the menu_script.js */
+}
+
+#mainmenu
+{
+        position: static;
+}
+
+table.menu td
+{
+        color: #F1F1F1;            /* Must be the same as tdColor in the menu_script.js */
+        background-color: #445395;
+        background-image: url(../dibus/cellpic1.gif); /* Must be the same as tdBgColor in the menu_script.js */
+        border: 0px;
+        padding: 0px 8px 2px;
+        height: 20px;
+        font-family: Arial;
+        font-size: 11px;
+        font-weight: bold;
+        white-space: nowrap;
+
+
+}
+
+
+td.Camp
+{       background: url(../dibus/_row1.gif);
+        background-repeat: repeat-x;
+        background-color: #F5F5F5;
+}
+

@@ -387,6 +387,22 @@ public class ApiClient
         catch { return (null, "Error desconegut."); }
     }
 
+    public async Task<(ImportacioAlumnesResult? Result, string? Error)>
+        ImportarAlumnesXlsAsync(MultipartFormDataContent form)
+    {
+        var resp = await _http.PostAsync("/api/examen/importar-alumnes-xls", form);
+        if (resp.IsSuccessStatusCode)
+            return (await resp.Content.ReadFromJsonAsync<ImportacioAlumnesResult>(_json), null);
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(
+                await resp.Content.ReadAsStringAsync());
+            var err = doc.RootElement.TryGetProperty("error", out var e) ? e.GetString() : null;
+            return (null, err ?? "Error desconegut.");
+        }
+        catch { return (null, "Error desconegut."); }
+    }
+
     public Task<List<AlumneMacDto>?> GetExamenMacsAsync() =>
         GetAsync<List<AlumneMacDto>>("/api/examen/macs");
 

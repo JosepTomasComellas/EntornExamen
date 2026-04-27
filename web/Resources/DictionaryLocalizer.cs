@@ -750,6 +750,23 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
 
         // ── Dashboard — botons admin Examen ───────────────────────────────────
         ["Dash_ExamenMacs"]    = "Dispositius (MACs)",
+        ["Dash_ImportarEpss"]  = "Importar EPSS",
+
+        // ── Importació EPSS ───────────────────────────────────────────────────
+        ["Epss_Title"]              = "Importació des d'EPSS",
+        ["Epss_SubtitleAlumnes"]    = "Importar alumnes (XLS)",
+        ["Epss_SubtitleFotos"]      = "Importar fotos (ZIP de la web)",
+        ["Epss_AlumnesDesc"]        = "Fitxer XLS descarregat de la pàgina de llistats d'EPSS. Els alumnes s'assignen a la classe indicada al fitxer.",
+        ["Epss_FotosDesc"]          = "ZIP de la pàgina de fotos d'EPSS (guardar pàgina web completa). Les fotos s'associen als alumnes pel DNI.",
+        ["Epss_SeleccionaFitxer"]   = "Selecciona fitxer XLS",
+        ["Epss_SeleccionaZip"]      = "Selecciona ZIP de fotos",
+        ["Epss_Importar"]           = "Importar",
+        ["Epss_Important"]          = "Important...",
+        ["Epss_ResultatAlumnes"]    = "{0} nous · {1} actualitzats · {2} omesos",
+        ["Epss_ResultatFotos"]      = "{0} fotos importades",
+        ["Epss_NoTrobades"]         = "Sense alumne (DNI no trobat):",
+        ["Epss_Errors"]             = "Errors:",
+        ["Epss_CapFitxer"]          = "Cap fitxer seleccionat",
     };
 
     // ── Castellà ─────────────────────────────────────────────────────────────
@@ -1493,6 +1510,23 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
 
         // ── Dashboard — botons admin Examen ───────────────────────────────────
         ["Dash_ExamenMacs"]    = "Dispositivos (MACs)",
+        ["Dash_ImportarEpss"]  = "Importar EPSS",
+
+        // ── Importació EPSS ───────────────────────────────────────────────────
+        ["Epss_Title"]              = "Importación desde EPSS",
+        ["Epss_SubtitleAlumnes"]    = "Importar alumnos (XLS)",
+        ["Epss_SubtitleFotos"]      = "Importar fotos (ZIP de la web)",
+        ["Epss_AlumnesDesc"]        = "Fichero XLS descargado de la página de listados de EPSS. Los alumnos se asignan a la clase indicada en el fichero.",
+        ["Epss_FotosDesc"]          = "ZIP de la página de fotos de EPSS (guardar página web completa). Las fotos se asocian a los alumnos por DNI.",
+        ["Epss_SeleccionaFitxer"]   = "Seleccionar fichero XLS",
+        ["Epss_SeleccionaZip"]      = "Seleccionar ZIP de fotos",
+        ["Epss_Importar"]           = "Importar",
+        ["Epss_Important"]          = "Importante...",
+        ["Epss_ResultatAlumnes"]    = "{0} nuevos · {1} actualizados · {2} omitidos",
+        ["Epss_ResultatFotos"]      = "{0} fotos importadas",
+        ["Epss_NoTrobades"]         = "Sin alumno (DNI no encontrado):",
+        ["Epss_Errors"]             = "Errores:",
+        ["Epss_CapFitxer"]          = "Ningún fichero seleccionado",
     };
 
     // ── Implementació IStringLocalizer ────────────────────────────────────────

@@ -1378,6 +1378,23 @@ app.MapPost("/api/examen/importar-alumnes", async (HttpRequest httpReq,
         : Results.Ok(result);
 }).RequireAuthorization();
 
+// ── Importació alumnes XLS (format EPSS natiu) ───────────────────────────────
+app.MapPost("/api/examen/importar-alumnes-xls", async (HttpRequest httpReq,
+    IExamenService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    if (!httpReq.HasFormContentType) return Results.BadRequest(new { error = "Cal multipart/form-data." });
+    var form = await httpReq.ReadFormAsync();
+    var fitxer = form.Files.GetFile("fitxer");
+    if (fitxer is null) return Results.BadRequest(new { error = "Camp 'fitxer' no trobat." });
+
+    using var stream = fitxer.OpenReadStream();
+    var (result, error) = await svc.ImportarAlumnesXlsAsync(stream, GetUserId(user), IsAdmin(user));
+    return error is not null
+        ? Results.BadRequest(new { error })
+        : Results.Ok(result);
+}).RequireAuthorization();
+
 // ── MACs ──────────────────────────────────────────────────────────────────────
 app.MapGet("/api/examen/macs", async (IExamenService svc, ClaimsPrincipal user) =>
 {

@@ -2,6 +2,7 @@ using AutoCo.Api.Data;
 using AutoCo.Api.Data.Models;
 using AutoCo.Api.Hubs;
 using AutoCo.Shared.DTOs;
+using ExcelDataReader;
 using Microsoft.EntityFrameworkCore;
 using System.IO.Compression;
 using System.Text;
@@ -22,6 +23,7 @@ public interface IExamenService
     Task ProcessDhcpEventAsync(DhcpEventRequest req);
     Task ProcessDnsEventAsync(DnsEventRequest req);
     Task<(ImportacioAlumnesResult Result, string? Error)> ImportarAlumnesAsync(Stream htmlStream, int professorId, bool isAdmin);
+    Task<(ImportacioAlumnesResult Result, string? Error)> ImportarAlumnesXlsAsync(Stream xlsStream, int professorId, bool isAdmin);
     Task<(ImportacioFotosResult Result, string? Error)> ImportarFotosAsync(Stream zipStream, string wwwrootPath);
     Task<List<AlumneMacDto>> GetMacsAsync(bool isAdmin);
     Task<bool> DeleteMacAsync(int id, bool isAdmin);
@@ -614,6 +616,95 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
     private sealed record FilaAlumne(
         int NumLlista, string Cognoms, string Nom, string? Dni, string? Baixa, string? Email);
 
+    // ─── Importació alumnes (XLS natiu EPSS) ─────────────────────────────────
+
+    public async Task<(ImportacioAlumnesResult Result, string? Error)> ImportarAlumnesXlsAsync(
+        Stream xlsStream, int professorId, bool isAdmin)
+    {
+        if (!isAdmin) return (new ImportacioAlumnesResult(0, 0, 0, []), "Sense permisos.");
+
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        ExcelReaderFactory.CreateReader(xlsStream, new ExcelReaderConfiguration
+            { FallbackEncoding = System.Text.Encoding.GetEncoding(1252) });
+
+        xlsStream.Position = 0;
+        using var reader = ExcelReaderFactory.CreateReader(xlsStream, new ExcelReaderConfiguration
+            { FallbackEncoding = System.Text.Encoding.GetEncoding(1252) });
+        var ds = reader.AsDataSet(new ExcelDataSetConfiguration
+            { ConfigureDataTable = _ => new ExcelDataTableConfiguration { UseHeaderRow = false } });
+
+        if (ds.Tables.Count == 0) return (new ImportacioAlumnesResult(0, 0, 0, ["Fitxer buit."]), null);
+        var sheet = ds.Tables[0];
+        if (sheet.Rows.Count < 4) return (new ImportacioAlumnesResult(0, 0, 0, ["Format incorrecte: menys de 4 files."]), null);
+
+        // Fila 0: "S1SX (2025)" → nom de classe
+        var nomClasse = sheet.Rows[0][0]?.ToString()?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(nomClasse))
+            return (new ImportacioAlumnesResult(0, 0, 0, ["No s'ha pogut detectar el nom de la classe."]), null);
+
+        var classe = await db.Classes.FirstOrDefaultAsync(c => c.Name == nomClasse);
+        if (classe is null)
+        {
+            classe = new Class { Name = nomClasse };
+            db.Classes.Add(classe);
+            await db.SaveChangesAsync();
+        }
+
+        var importats = 0; var actualitzats = 0; var saltats = 0;
+        var errors = new List<string>();
+
+        // Fila 0: nom, Fila 1: buida, Fila 2: capçaleres, Fila 3+: dades
+        for (int r = 3; r < sheet.Rows.Count; r++)
+        {
+            var row = sheet.Rows[r];
+            var numStr = row[0]?.ToString()?.Trim() ?? "";
+            if (!int.TryParse(numStr, out var num)) { saltats++; continue; }
+
+            var cognoms = row[1]?.ToString()?.Trim() ?? "";
+            var nom     = row[2]?.ToString()?.Trim() ?? "";
+            var dni     = row[3]?.ToString()?.Trim();
+            var baixa   = row[5]?.ToString()?.Trim(); // col 5: Baixa
+            var email   = row[9]?.ToString()?.Trim()?.ToLower(); // col 9: Email
+
+            if (!string.IsNullOrWhiteSpace(baixa)) { saltats++; continue; }
+            if (string.IsNullOrWhiteSpace(nom) && string.IsNullOrWhiteSpace(cognoms)) { saltats++; continue; }
+
+            if (string.IsNullOrWhiteSpace(email))
+                email = GeneraEmail(nom, cognoms);
+
+            try
+            {
+                var student = await db.Students.FirstOrDefaultAsync(s => s.Email == email);
+                if (student is null)
+                {
+                    db.Students.Add(new Student
+                    {
+                        ClassId      = classe.Id,
+                        Nom          = nom,
+                        Cognoms      = cognoms,
+                        Email        = email,
+                        NumLlista    = num,
+                        Dni          = dni,
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(PasswordHelper.Generate())
+                    });
+                    importats++;
+                }
+                else
+                {
+                    student.Nom      = nom;
+                    student.Cognoms  = cognoms;
+                    student.NumLlista = num;
+                    if (!string.IsNullOrWhiteSpace(dni)) student.Dni = dni;
+                    actualitzats++;
+                }
+            }
+            catch (Exception ex) { errors.Add($"Fila {num}: {ex.Message}"); }
+        }
+
+        await db.SaveChangesAsync();
+        return (new ImportacioAlumnesResult(importats, actualitzats, saltats, errors), null);
+    }
+
     // ─── Importació fotos ─────────────────────────────────────────────────────
 
     public async Task<(ImportacioFotosResult Result, string? Error)> ImportarFotosAsync(
@@ -633,11 +724,13 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 e.Name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
                 e.Name.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase)))
             {
-                // Nom del fitxer = DNI/NIE
-                var dni = Path.GetFileNameWithoutExtension(entry.Name).Trim().ToUpper();
+                // Nom del fitxer = DNI sencer o part numèrica (format EPSS: sense lletra)
+                var dni     = Path.GetFileNameWithoutExtension(entry.Name).Trim().ToUpper();
+                var dniNum  = Regex.Replace(dni, @"[^0-9]", "");
                 var student = await db.Students
-                    .FirstOrDefaultAsync(s => s.Dni != null &&
-                        s.Dni.ToUpper() == dni);
+                    .FirstOrDefaultAsync(s => s.Dni != null && (
+                        s.Dni.ToUpper() == dni ||
+                        Regex.Replace(s.Dni, @"[^0-9]", "") == dniNum));
 
                 if (student is null)
                 {
