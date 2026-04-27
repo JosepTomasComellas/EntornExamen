@@ -1,4 +1,4 @@
-# EntornExamen + AutoCo · v1.2.0
+# EntornExamen + AutoCo · v1.3.1
 
 Sistema integrat en dues parts:
 - **EntornExamen** — control de presència en temps real durant exàmens sobre xarxa WiFi aïllada
@@ -45,9 +45,9 @@ L'alumne accedeix a **`https://192.168.100.1/examen`** i s'identifica amb el seu
 - Check-in automàtic cada 30 s
 - Rebuda de missatges del professor (diàleg emergent obligatori)
 
-**Importació**
-- Alumnes: fitxer HTML/XLS d'Esfer@ (format del centre)
-- Fotos: ZIP de `{DNI}.jpg`
+**Importació (Admin)**
+- Alumnes: fitxer XLS/HTML exportat d'EPSS (auto-detecta format)
+- Fotos: ZIP amb `{DNI_numèric}.jpg` descarregat des d'EPSS
 
 ### Arquitectura de dades (nous models)
 
@@ -89,8 +89,9 @@ Student      ──< RegistreConnexio   (null si MAC desconeguda)
 | `POST` | `/api/examen/checkin` | Cap | Check-in alumne |
 | `POST` | `/api/examen/dhcp/event` | Cap | Event DHCP (hook) |
 | `POST` | `/api/examen/dns/event` | Cap | Event DNS |
-| `POST` | `/api/examen/importar-alumnes` | JWT (admin) | Importa alumnes HTML/XLS |
-| `POST` | `/api/examen/importar-fotos` | JWT (admin) | Importa fotos ZIP |
+| `POST` | `/api/examen/importar-alumnes` | JWT (admin) | Importa alumnes HTML/XLS (Esfer@) |
+| `POST` | `/api/examen/importar-alumnes-xls` | JWT (admin) | Importa alumnes XLS/HTML (EPSS) |
+| `POST` | `/api/examen/importar-fotos` | JWT (admin) | Importa fotos ZIP ({DNI}.jpg) |
 
 ---
 
@@ -271,6 +272,18 @@ ActivityTemplate
 ---
 
 ## Changelog
+
+### v1.3.1 (2026-04-27)
+- Fix: `ImportarAlumnesXlsAsync` — suport per fitxers HTML amb extensió `.xls` (format habitual d'EPSS); s'elimina la crida duplicada a `CreateReader` que causava `HeaderException`
+- Fix: `ImportarFotosAsync` — `Regex.Replace` en LINQ no traduïble a SQL; es carreguen els DNIs a memòria prèviament
+- Instruccions pas a pas per crear el ZIP de fotos a la pàgina d'importació
+- Botó "Importar EPSS" afegit a la capçalera de Gestió de Classes
+
+### v1.3.0 (2026-04-27)
+- Importació d'alumnes des d'EPSS: fitxer XLS natiu (ExcelDataReader), associació per email, creació automàtica de classe
+- Importació de fotos des d'EPSS: ZIP amb `{DNI_numèric}.jpg`, matching per DNI complet o part numèrica
+- Pàgina `/admin/importar-epss` amb dos panells d'importació
+- Botó "Importar EPSS" al Dashboard (admin)
 
 ### v1.2.0 (2026-04-27)
 - Rebranding complet: totes les referències visibles a "AutoCo" substituïdes per "Entorn d'Examens — Salesians de Sarrià"
