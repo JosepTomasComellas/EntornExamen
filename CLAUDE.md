@@ -1,178 +1,153 @@
-# AutoCo — Sistema d'Avaluació entre Iguals
+# EntornExamen — Control de Presència en Examens
 
-Aplicació web per gestionar **autoavaluació** i **coavaluació** d'alumnes en activitats de grup. Tot el text de la interfície és en **català**.
+Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada. Tot el text de la interfície és en **català** (selector ca/es disponible).
+
+**Salesians de Sarrià — Departament d'Informàtica · CFGS ASIX**
 
 ## Estructura del projecte
 
 ```
-AutoCo/
-├── api/                        # API REST (ASP.NET Core 10 Minimal API)
+EntornExamen/
+├── api/                          # API REST (ASP.NET Core 10 Minimal API)
 │   ├── Data/
-│   │   ├── AppDbContext.cs     # EF Core DbContext
-│   │   ├── Constants.cs        # Criteris d'avaluació globals per defecte
-│   │   ├── SeedData.cs         # Seed inicial (admin per defecte)
-│   │   └── Models/             # Entitats: Professor, Class, Student, Module,
-│   │                           #           Activity, Group, Evaluation...
-│   ├── DTOs/Dtos.cs            # Tots els records de request/response
-│   ├── Services/               # Lògica de negoci (Auth, Class, Activity,
-│   │                           #   Evaluation, Results, Email, Backup)
-│   ├── Program.cs              # Minimal API endpoints + DI
+│   │   ├── AppDbContext.cs       # EF Core DbContext (EnsureCreated, sense migracions formals)
+│   │   ├── SeedData.cs           # Admin inicial des de .env
+│   │   └── Models/               # Professor, Class, Student, AlumneMac,
+│   │                             #   SessioExamen, RegistreConnexio, PeticioTdns, ProfessorLogin
+│   ├── Hubs/
+│   │   └── ExamenHub.cs          # Publicador Redis (temps real)
+│   ├── Services/
+│   │   ├── ExamenService.cs      # Lògica sessions + check-in per IP
+│   │   ├── DhcpMonitorService.cs # Monitor dhcpd.leases (IHostedService)
+│   │   ├── DnsMonitorService.cs  # Monitor dns-queries.log (IHostedService)
+│   │   ├── AuthService.cs        # Login professors (JWT)
+│   │   ├── ClassService.cs       # Classes + alumnes
+│   │   ├── BackupService.cs      # Export/import JSON
+│   │   └── EmailService.cs       # SMTP (professors)
+│   ├── Program.cs                # Endpoints + DI + DDL (CREATE/ALTER TABLE inline)
 │   └── Dockerfile
-├── web/                        # Frontend (Blazor Server + MudBlazor)
+├── web/                          # Frontend (Blazor Server + MudBlazor)
 │   ├── Components/
-│   │   ├── App.razor           # Arrel HTML: manifest PWA, service worker, i18n
+│   │   ├── App.razor             # Arrel HTML: manifest PWA, service worker, i18n
 │   │   ├── Layout/
-│   │   │   └── MainLayout.razor  # Navbar, footer, tema de color, mode fosc
-│   │   ├── Pages/
-│   │   │   ├── Index.razor     # Pàgina d'inici (selecció de rol)
-│   │   │   ├── Auth/           # Login professor i alumne
-│   │   │   ├── Alumne/         # Dashboard i formulari d'avaluació
-│   │   │   └── Professor/      # Dashboard, classes, alumnes, activitats,
-│   │   │                       #   grups, resultats, gràfiques, informe PDF
-│   │   └── Shared/             # ActivityCard, diàlegs reutilitzables
+│   │   │   └── MainLayout.razor  # Navbar, mode fosc, selector idioma
+│   │   └── Pages/
+│   │       ├── Index.razor       # Pàgina d'inici (accés professor / accés alumne)
+│   │       ├── Auth/             # LoginProfessor, LoginAlumne (redirecció → /examen)
+│   │       ├── Examen/
+│   │       │   └── Portal.razor  # /examen — identificació alumne per email, check-in
+│   │       ├── Professor/
+│   │       │   ├── Dashboard.razor   # /professor/dashboard
+│   │       │   ├── Examen.razor      # /professor/examen — plafó temps real
+│   │       │   ├── Classes.razor     # /professor/classes
+│   │       │   └── Alumnes.razor     # /professor/alumnes/{id}
+│   │       └── Admin/
+│   │           ├── Professors.razor  # /admin/professors
+│   │           ├── ExamenMacs.razor  # /admin/examen-macs
+│   │           ├── Backup.razor      # /admin/backup
+│   │           └── Estadistiques.razor # /admin/estadistiques
 │   ├── Resources/
 │   │   └── DictionaryLocalizer.cs  # i18n estàtica (ca/es), evita ResourceManager a Docker
 │   ├── Services/
-│   │   ├── ApiClient.cs            # Client HTTP cap a l'API (tots els endpoints)
-│   │   ├── UserStateService.cs     # Estat de sessió Blazor (substitueix ISession)
-│   │   └── ParticipationNotificationService.cs  # Redis pub/sub → Blazor
+│   │   ├── ApiClient.cs              # Client HTTP cap a l'API
+│   │   ├── UserStateService.cs       # Sessió Blazor (JWT professors)
+│   │   ├── ExamenNotificationService.cs  # Bus intern notificacions alumne/professor
+│   │   └── ExamenRedisSubscriber.cs      # Subscriptor Redis → Blazor
 │   ├── wwwroot/
-│   │   ├── css/site.css        # Estils globals (DnD, dark mode, print, informe PDF)
-│   │   ├── js/                 # app.js (utilitats JS), charts.js (Chart.js interop)
-│   │   ├── manifest.json       # PWA manifest (theme_color #1e293b)
-│   │   ├── service-worker.js   # PWA: cache-first assets, pàgina offline
-│   │   └── offline.html        # Pàgina offline en català
-│   ├── Program.cs              # Configuració (Redis, SignalR, MudBlazor, i18n, DataProtection)
+│   │   ├── css/site.css          # Estils globals (dark mode, print, responsive)
+│   │   ├── js/                   # app.js (utilitats), charts.js (Chart.js interop)
+│   │   ├── manifest.json         # PWA manifest
+│   │   ├── service-worker.js     # PWA: cache-first assets estàtics, pàgina offline
+│   │   └── offline.html          # Pàgina offline en català
+│   ├── Program.cs                # Configuració (Redis, MudBlazor, i18n, DataProtection)
 │   └── Dockerfile
-├── shared/                     # DTOs i AppVersion compartits (api + web)
-│   └── AppVersion.cs           # Versió actual de l'aplicació
-├── AutoCo.Tests/               # Tests unitaris xUnit (ResultsService, EF Core InMemory)
-├── nginx/                      # Proxy invers SSL (auto-signat o certificat propi)
-├── deploy/                     # Scripts de desplegament
-└── docker-compose.yml          # Orquestració: db + redis + api + web + nginx
+├── shared/                       # DTOs i AppVersion compartits (api + web)
+│   ├── Dtos.cs                   # Tots els records de request/response
+│   └── AppVersion.cs             # Versió actual
+├── EntornExamen.Tests/           # Tests unitaris xUnit (ExamenService, EF Core InMemory)
+├── nginx/                        # Proxy invers SSL (auto-signat o certificat propi)
+│   └── nginx.conf                # Escolta 443 intern; publicat al port 4445 (docker-compose)
+├── deploy/
+│   └── server-update.sh          # git pull + docker compose build + up
+├── scripts/examen/               # Configuració DHCP + DNS del servidor
+└── docker-compose.yml            # Orquestració: db + redis + api + web + nginx
 ```
 
 ## Desplegament
 
 ```bash
-# Construir i aixecar tots els serveis
-docker compose up --build
-
 # Actualitzar servidor (recomanat)
-bash /docker/AutoCo/deploy/server-update.sh
+bash /docker/EntornExamen/deploy/server-update.sh
+
+# Construcció completa des de zero
+docker compose up --build -d
 ```
 
-**URLs locals (via nginx):**
-- Web: https://localhost
+**URL d'accés (via nginx):**
+- HTTPS: `https://192.168.100.1:4445` (xarxa d'examen) o `https://localhost:4445` (local)
 
 ## Serveis Docker
 
 | Servei | Imatge | Descripció |
 |--------|--------|------------|
-| `db` | SQL Server 2022 Express | Base de dades principal |
-| `redis` | Redis 7 Alpine | Caché, backplane SignalR, OTP reset contrasenya |
-| `api` | ASP.NET Core 10 | API REST + JWT |
-| `web` | ASP.NET Core 10 | Blazor Server + MudBlazor |
-| `nginx` | nginx Alpine | Proxy SSL, WebSocket Blazor |
+| `entornexamen-db` | SQL Server 2022 Express | Base de dades principal |
+| `entornexamen-redis` | Redis 7 Alpine | Caché, pub/sub temps real |
+| `entornexamen-api` | ASP.NET Core 10 | API REST + JWT |
+| `entornexamen-web` | ASP.NET Core 10 | Blazor Server + MudBlazor |
+| `entornexamen-nginx` | nginx Alpine | Proxy SSL, WebSocket Blazor |
 
-La `api` espera que `db` i `redis` estiguin healthy abans d'arrencar.
+L'API espera que `db` i `redis` estiguin healthy abans d'arrencar.
 
 ## Configuració (variables d'entorn via .env)
 
-Per a producció real, canviar:
+Variables obligatòries:
+- `MSSQL_SA_PASSWORD` — contrasenya SQL Server (mínim 8 car., majúscules + números)
 - `JWT_SECRET` — secret JWT (mínim 32 caràcters)
-- `MSSQL_SA_PASSWORD` — contrasenya SQL Server
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD` — credencials de l'administrador inicial
+- `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_NOM` — credencials admin inicial
+
+Variables opcionals:
+- `EXAMEN_DOMINI_EMAIL` — domini acceptat (per defecte: `sarria.salesians.cat`)
+- `EXAMEN_CHECKIN_INTERVAL_SECONDS` — interval check-in en segons (per defecte: `30`)
+- `SMTP_*` — configuració SMTP per a correus de professors
 
 ## Model de dades
 
 ```
-Professor ──< Module ──< Activity ──< Group ──< GroupMember (Student)
-              │               ├──< ActivityCriteria (criteris per activitat)
-              │               ├──< Evaluation ──< EvaluationScore (per criteri)
-              │               ├──< ProfessorNote (per alumne)
-              │               └──< ActivityLog (registre d'accions)
-Class ────────┘
-  ├──< Student
-  └──< ModuleExclusion
-ActivityTemplate (per professor, criteris JSON)
+Professor ──< ProfessorLogin     (registre d'accessos)
+Class ────< Student ──< AlumneMac         (MAC ↔ correu)
+Class ────< SessioExamen ──< RegistreConnexio ──< PeticioTdns
+                              └── Student (nullable, vinculat per IP en el check-in)
 ```
 
-- Un alumne pertany a una `Class` i autentifica amb email + contrasenya
-- Una `Activity` pertany a un `Module` (que pertany a una `Class`)
-- Un alumne avalua tots els membres del seu grup (inclòs ell mateix)
-- `IsSelf = true` quan avaluador = avaluat (autoavaluació)
+## Flux principal
 
-## Criteris d'avaluació
-
-Definits a `api/Data/Constants.cs` com a globals per defecte. Cada activitat pot sobreescriure'ls via `ActivityCriteria`.
-
-| Key | Label |
-|-----|-------|
-| `probitat` | Probitat |
-| `autonomia` | Autonomia |
-| `responsabilitat` | Responsabilitat i Treball de qualitat |
-| `collaboracio` | Col·laboració i treball en equip |
-| `comunicacio` | Comunicació |
-
-Puntuació: **escala E/D/C/B/A** (estreles 1–5 = valors 1, 3.5, 5, 7.5, 10).
+1. Professor crea una sessió d'examen per la seva classe
+2. L'alumne accedeix a `/examen`, introdueix el correu corporatiu (sense contrasenya)
+3. L'API detecta la IP via `HttpContext.Connection.RemoteIpAddress` (normalitzada IPv4-mapped IPv6)
+4. La IP es vincula al registre DHCP corresponent (MAC ↔ alumne)
+5. L'alumne fa check-in automàtic cada N segons
+6. El professor veu l'estat de tota la classe en temps real via Redis pub/sub
 
 ## Rols i autenticació
 
-- **Admin** — professor amb `IsAdmin=true`. Gestiona professors i veu tot.
-- **Professor** — veu i gestiona les seves pròpies classes/activitats.
-- **Alumne** — accedeix amb email + contrasenya. Pot avaluar quan l'activitat és oberta.
+- **Admin** — professor amb `IsAdmin=true`. Gestió global.
+- **Professor** — JWT. Veu i gestiona les seves classes i sessions.
+- **Alumne** — sense contrasenya. Identificat per correu + IP de la xarxa d'examen.
 
-JWT (professors) + `ProtectedLocalStorage` (Blazor). Estat global via `UserStateService` (Scoped).
+## Notificacions Redis
 
-## Endpoints principals de l'API
-
-```
-POST /api/auth/professor          # Login professor
-POST /api/auth/student            # Login alumne
-
-GET/POST/PUT/DELETE /api/professors                       # Gestió professors (admin)
-GET/POST/PUT/DELETE /api/classes                          # Gestió classes
-GET/POST/PUT/DELETE /api/classes/{id}/students            # Gestió alumnes
-POST /api/classes/{id}/students/bulk                      # Importació CSV
-POST /api/classes/{id}/students/{sid}/move                # Moure alumne
-
-GET/POST/PUT/DELETE /api/classes/{id}/modules             # Gestió mòduls
-GET/POST/DELETE    /api/modules/{id}/exclusions           # Exclusions per mòdul
-
-GET/POST/PUT/DELETE /api/activities                       # Gestió activitats
-POST /api/activities/{id}/toggle                          # Obrir/tancar
-POST /api/activities/{id}/duplicate                       # Duplicar (mateixa classe)
-POST /api/activities/{id}/duplicate-cross                 # Duplicar a una altra classe
-GET  /api/activities/{id}/participation                   # Estat de participació
-POST /api/activities/{id}/remind                          # Recordatoris per correu
-GET  /api/activities/{id}/criteria                        # Criteris de l'activitat
-PUT  /api/activities/{id}/criteria                        # Desar criteris personalitzats
-GET/POST/DELETE /api/activities/{id}/groups               # Gestió grups
-PUT  /api/activities/{id}/groups/{gid}                    # Renomenar grup
-POST/DELETE /api/activities/{id}/groups/{gid}/members     # Membres de grup
-GET  /api/activities/{id}/log                             # Registre d'activitat
-
-GET  /api/evaluations/{activityId}           # Formulari d'avaluació (alumne)
-POST /api/evaluations/{activityId}           # Guardar avaluació
-GET  /api/student/activities                 # Dashboard alumne
-
-GET  /api/results/{activityId}               # Resultats (professor)
-GET  /api/results/{activityId}/chart         # Dades gràfica
-GET  /api/results/{activityId}/csv           # Exportar CSV
-
-GET  /api/criteria                           # Criteris globals
-GET  /api/health                             # Estat DB + Redis (autenticat)
-```
+| Canal | Receptor | Events |
+|-------|---------|--------|
+| `examen:sessio:{id}` | Professor | `AlumneConnectat`, `AlumneDesconnectat`, `NouCheckin`, `NovaPeticioExterna`, `MacDesconeguda`, `MissatgeActualitzat`, `SessioTancadaGlobal` |
+| `examen:alumne:{id}` | Alumne | `MissatgeProfessor`, `SessioTancadaGlobal` |
 
 ## Convencions
 
-- Tot el text de la UI en **català** (o castellà via selector d'idioma)
+- Tot el text de la UI en **català** (selector ca/es via `DictionaryLocalizer`)
 - Noms de fitxers i classes en anglès, text visible en català
 - API: Minimal API (no controllers), ASP.NET Core 10
 - Web: **Blazor Server + MudBlazor** (no Razor Pages, no MVC, no JS frameworks)
 - i18n: `DictionaryLocalizer` estàtic — evita problemes amb `ResourceManager` a Docker
-- EF Core amb migracions automàtiques a l'inici (`db.Database.Migrate()`)
-- Passwords hashejades amb BCrypt (work factor 12)
-- Caché de resultats: Redis `IDistributedCache`, TTL 5 min, invalidació automàtica
-- Temps real: Redis pub/sub → `ParticipationNotificationService` → Blazor
+- BD: `EnsureCreated` + DDL inline a `Program.cs` (no migracions EF formals)
+- Temps real: Redis pub/sub → `ExamenRedisSubscriber` → `ExamenNotificationService` → Blazor
+- Solució VS: `EntornExamen.sln` (Api, Web, Shared, Tests)
