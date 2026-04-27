@@ -1,4 +1,4 @@
-# EntornExamen + AutoCo · v1.1.1
+# EntornExamen + AutoCo · v1.2.0
 
 Sistema integrat en dues parts:
 - **EntornExamen** — control de presència en temps real durant exàmens sobre xarxa WiFi aïllada
@@ -271,6 +271,11 @@ ActivityTemplate
 ---
 
 ## Changelog
+
+### v1.2.0 (2026-04-27)
+- Rebranding complet: totes les referències visibles a "AutoCo" substituïdes per "Entorn d'Examens — Salesians de Sarrià"
+- Botó "← Dashboard" al plafó d'examen (no hi havia manera de sortir quan no hi havia sessió activa)
+- `manifest.json`, `App.razor`, footer i `DictionaryLocalizer` (ca + es) actualitzats
 
 ### v1.1.1 (2026-04-27)
 - Fix: `EnsureCreated()` en lloc de `Migrate()` — el projecte no té fitxers de migració EF Core i `Migrate()` fallava amb `PendingModelChangesWarning` a EF Core 9+
