@@ -23,6 +23,8 @@ public interface IExamenService
     Task ProcessDnsEventAsync(DnsEventRequest req);
     Task<(ImportacioAlumnesResult Result, string? Error)> ImportarAlumnesAsync(Stream htmlStream, int professorId, bool isAdmin);
     Task<(ImportacioFotosResult Result, string? Error)> ImportarFotosAsync(Stream zipStream, string wwwrootPath);
+    Task<List<AlumneMacDto>> GetMacsAsync(bool isAdmin);
+    Task<bool> DeleteMacAsync(int id, bool isAdmin);
 }
 
 public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config) : IExamenService
@@ -37,6 +39,14 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
     {
         var path = Path.Combine(wwwrootPath, "fotos", "alumnes", $"{studentId}.jpg");
         return File.Exists(path) ? FotoUrl(studentId) : null;
+    }
+
+    private string? TryFotoUrl(int studentId)
+    {
+        var wwwroot = config["Examen:WebWwwrootPath"] ?? "";
+        return string.IsNullOrEmpty(wwwroot)
+            ? FotoUrl(studentId)
+            : FotoUrlSiExisteix(studentId, wwwroot);
     }
 
     private static RegistreConnexioDto ToDto(RegistreConnexio r, int maxDns = 10) =>
@@ -134,7 +144,7 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             .Select(r => new ExamenAlumneDto(
                 r.StudentId, r.Student?.Nom, r.Student?.Cognoms, r.Student?.Email,
                 r.Student?.NumLlista,
-                r.StudentId.HasValue ? FotoUrl(r.StudentId.Value) : null,
+                r.StudentId.HasValue ? TryFotoUrl(r.StudentId.Value) : null,
                 r.MacAddress, r.IpAssignada,
                 r.UltimCheckinAt, (EstatConnexioDto)(int)r.Estat,
                 r.PeticiosDns.OrderByDescending(p => p.Timestamp).Take(10)
@@ -336,10 +346,12 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         _ = hub.NotificaNouCheckinAsync(sessio.Id, new ExamenEventAlumne(
             student.Id, student.Nom, student.Cognoms, null, mac, ara));
 
+        var interval = int.TryParse(config["Examen:CheckinIntervalSeconds"], out var iv) ? iv : 30;
         return (new CheckinResponse(
             new CheckinAlumneInfo(student.Id, student.Nom, student.Cognoms,
-                student.Class.Name, FotoUrl(student.Id)),
-            new CheckinSessioInfo(sessio.Id, sessio.Titol, sessio.Descripcio, sessio.MissatgeActiu)),
+                student.Class.Name, TryFotoUrl(student.Id)),
+            new CheckinSessioInfo(sessio.Id, sessio.Titol, sessio.Descripcio,
+                sessio.MissatgeActiu, interval)),
             null);
     }
 
@@ -431,6 +443,39 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             _ = hub.NotificaNovaPeticioExternaAsync(registre.SessioId, new ExamenEventDns(
                 registre.StudentId, registre.Student?.Nom, req.Domini, req.Timestamp));
         }
+    }
+
+    // ─── Gestió de MACs ──────────────────────────────────────────────────────
+
+    public async Task<List<AlumneMacDto>> GetMacsAsync(bool isAdmin)
+    {
+        if (!isAdmin) return [];
+
+        return await db.AlumneMacs
+            .Include(m => m.Student)
+                .ThenInclude(s => s.Class)
+            .OrderBy(m => m.Student != null ? m.Student.Class!.Name : "")
+            .ThenBy(m => m.Student != null ? m.Student.Cognoms : "")
+            .ThenBy(m => m.PrimerCopVist)
+            .Select(m => new AlumneMacDto(
+                m.Id, m.StudentId,
+                m.Student != null ? m.Student.Nom : "—",
+                m.Student != null ? m.Student.Cognoms : "—",
+                m.Student != null ? m.Student.Email : "—",
+                m.Student != null && m.Student.Class != null ? m.Student.Class.Name : "—",
+                m.Mac, m.Dispositiu, m.PrimerCopVist,
+                m.StudentId > 0 ? TryFotoUrl(m.StudentId) : null))
+            .ToListAsync();
+    }
+
+    public async Task<bool> DeleteMacAsync(int id, bool isAdmin)
+    {
+        if (!isAdmin) return false;
+        var mac = await db.AlumneMacs.FindAsync(id);
+        if (mac is null) return false;
+        db.AlumneMacs.Remove(mac);
+        await db.SaveChangesAsync();
+        return true;
     }
 
     // ─── Importació alumnes (HTML disfressat de XLS) ──────────────────────────

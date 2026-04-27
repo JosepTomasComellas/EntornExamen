@@ -274,4 +274,147 @@ public class ExamenServiceTests
         var sessioDb = await db.SessionsExamen.FindAsync(sessio.Id);
         Assert.Null(sessioDb?.MissatgeActiu);
     }
+
+    // ── Tests DHCP ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ProcessDhcp_Connected_MarcaAlumneConnectat()
+    {
+        var (db, profId, classId, studentId) =
+            SeedBase(nameof(ProcessDhcp_Connected_MarcaAlumneConnectat));
+        var svc = new ExamenService(db, CreateHub(), CreateConfig());
+
+        // Fem checkin per crear el RegistreConnexio i associar la MAC
+        var (sessio, _) = await svc.CreateSessioAsync(
+            new CreateSessioRequest(classId, "Test DHCP", null), profId);
+        Assert.NotNull(sessio);
+
+        await svc.CheckinAsync(
+            new CheckinRequest("joan.mas@sarria.salesians.cat", "aa:bb:cc:dd:ee:ff"));
+
+        // Simulem desconnexió manual
+        var registre = await db.RegistresConnexio.FirstAsync(r => r.StudentId == studentId);
+        registre.Estat = EstatConnexio.Desconnectat;
+        await db.SaveChangesAsync();
+
+        // Evento DHCP connected
+        await svc.ProcessDhcpEventAsync(
+            new DhcpEventRequest("aa:bb:cc:dd:ee:ff", "192.168.100.101", "connected"));
+
+        registre = await db.RegistresConnexio.FirstAsync(r => r.StudentId == studentId);
+        Assert.Equal(EstatConnexio.Connectat, registre.Estat);
+        Assert.Equal("192.168.100.101", registre.IpAssignada);
+    }
+
+    [Fact]
+    public async Task ProcessDhcp_Disconnected_MarcaAlumneDesconnectat()
+    {
+        var (db, profId, classId, studentId) =
+            SeedBase(nameof(ProcessDhcp_Disconnected_MarcaAlumneDesconnectat));
+        var svc = new ExamenService(db, CreateHub(), CreateConfig());
+
+        var (sessio, _) = await svc.CreateSessioAsync(
+            new CreateSessioRequest(classId, "Test DHCP Disc", null), profId);
+        Assert.NotNull(sessio);
+
+        await svc.CheckinAsync(
+            new CheckinRequest("joan.mas@sarria.salesians.cat", "aa:bb:cc:dd:ee:ff"));
+
+        await svc.ProcessDhcpEventAsync(
+            new DhcpEventRequest("aa:bb:cc:dd:ee:ff", null, "disconnected"));
+
+        var registre = await db.RegistresConnexio.FirstAsync(r => r.StudentId == studentId);
+        Assert.Equal(EstatConnexio.Desconnectat, registre.Estat);
+        Assert.NotNull(registre.DesconnectatAt);
+    }
+
+    [Fact]
+    public async Task ProcessDhcp_MacDesconeguda_CreaRegistreSenseEstudiant()
+    {
+        var (db, profId, classId, _) =
+            SeedBase(nameof(ProcessDhcp_MacDesconeguda_CreaRegistreSenseEstudiant));
+        var svc = new ExamenService(db, CreateHub(), CreateConfig());
+
+        var (sessio, _) = await svc.CreateSessioAsync(
+            new CreateSessioRequest(classId, "Test MAC desc.", null), profId);
+        Assert.NotNull(sessio);
+
+        await svc.ProcessDhcpEventAsync(
+            new DhcpEventRequest("ff:ff:ff:ff:ff:ff", "192.168.100.200", "connected"));
+
+        var registre = await db.RegistresConnexio
+            .FirstOrDefaultAsync(r => r.MacAddress == "ff:ff:ff:ff:ff:ff");
+        Assert.NotNull(registre);
+        Assert.Null(registre.StudentId);
+        Assert.Equal("192.168.100.200", registre.IpAssignada);
+    }
+
+    [Fact]
+    public async Task ProcessDhcp_SenseSessioActiva_NoFaRes()
+    {
+        var (db, _, _, _) =
+            SeedBase(nameof(ProcessDhcp_SenseSessioActiva_NoFaRes));
+        var svc = new ExamenService(db, CreateHub(), CreateConfig());
+
+        // No hi ha sessió activa
+        await svc.ProcessDhcpEventAsync(
+            new DhcpEventRequest("aa:bb:cc:dd:ee:ff", "192.168.100.1", "connected"));
+
+        var count = await db.RegistresConnexio.CountAsync();
+        Assert.Equal(0, count);
+    }
+
+    // ── Tests GetMacs / DeleteMac ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetMacs_Admin_RetornaLlista()
+    {
+        var (db, profId, classId, studentId) =
+            SeedBase(nameof(GetMacs_Admin_RetornaLlista));
+        var svc = new ExamenService(db, CreateHub(), CreateConfig());
+
+        await svc.CreateSessioAsync(
+            new CreateSessioRequest(classId, "Test", null), profId);
+        await svc.CheckinAsync(
+            new CheckinRequest("joan.mas@sarria.salesians.cat", "aa:bb:cc:dd:ee:ff"));
+
+        var macs = await svc.GetMacsAsync(isAdmin: true);
+        Assert.Single(macs);
+        Assert.Equal("aa:bb:cc:dd:ee:ff", macs[0].Mac);
+    }
+
+    [Fact]
+    public async Task GetMacs_NoAdmin_RetornaLlistaVuida()
+    {
+        var (db, profId, classId, _) =
+            SeedBase(nameof(GetMacs_NoAdmin_RetornaLlistaVuida));
+        var svc = new ExamenService(db, CreateHub(), CreateConfig());
+
+        await svc.CreateSessioAsync(
+            new CreateSessioRequest(classId, "Test", null), profId);
+        await svc.CheckinAsync(
+            new CheckinRequest("joan.mas@sarria.salesians.cat", "aa:bb:cc:dd:ee:ff"));
+
+        var macs = await svc.GetMacsAsync(isAdmin: false);
+        Assert.Empty(macs);
+    }
+
+    [Fact]
+    public async Task DeleteMac_Admin_EliminaRegistre()
+    {
+        var (db, profId, classId, _) =
+            SeedBase(nameof(DeleteMac_Admin_EliminaRegistre));
+        var svc = new ExamenService(db, CreateHub(), CreateConfig());
+
+        await svc.CreateSessioAsync(
+            new CreateSessioRequest(classId, "Test", null), profId);
+        await svc.CheckinAsync(
+            new CheckinRequest("joan.mas@sarria.salesians.cat", "aa:bb:cc:dd:ee:ff"));
+
+        var macId = (await db.AlumneMacs.FirstAsync()).Id;
+        var ok    = await svc.DeleteMacAsync(macId, isAdmin: true);
+
+        Assert.True(ok);
+        Assert.Equal(0, await db.AlumneMacs.CountAsync());
+    }
 }

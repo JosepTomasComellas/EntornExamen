@@ -387,6 +387,12 @@ public class ApiClient
         catch { return (null, "Error desconegut."); }
     }
 
+    public Task<List<AlumneMacDto>?> GetExamenMacsAsync() =>
+        GetAsync<List<AlumneMacDto>>("/api/examen/macs");
+
+    public Task<bool> DeleteExamenMacAsync(int id) =>
+        DeleteAsync($"/api/examen/macs/{id}");
+
     public async Task<(ImportacioFotosResult? Result, string? Error)>
         ImportarFotosExamenAsync(MultipartFormDataContent form)
     {

@@ -1,0 +1,169 @@
+@page "/admin/examen-macs"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject UserStateService UserState
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+@inject IStringLocalizer<SharedResources> Loc
+
+<PageTitle>@Loc["Macs_Title"] – AutoCo</PageTitle>
+@if (!UserState.IsAdmin) { Nav.NavigateTo("/"); return; }
+
+<!-- Capçalera -->
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
+    <MudButton StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/professor/dashboard"
+               Variant="Variant.Text" Color="Color.Default">
+        @Loc["Nav_Dashboard"]
+    </MudButton>
+    <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+    <MudIcon Icon="@Icons.Material.Filled.Devices" Color="Color.Primary" Class="mr-1" />
+    <MudText Typo="Typo.h5" Style="font-weight:700">@Loc["Macs_Title"]</MudText>
+    <MudSpacer />
+    <MudText Typo="Typo.body2" Color="Color.Secondary">
+        @_filtrats.Count / @_macs.Count
+    </MudText>
+</MudStack>
+
+<!-- Filtres -->
+<MudGrid Spacing="2" Class="mb-4">
+    <MudItem xs="12" sm="6" md="5">
+        <MudTextField @bind-Value="_cerca" Label="@Loc["Macs_Search"]"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      Clearable="true" Immediate="true" Margin="Margin.Dense" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4">
+        <MudSelect T="string" @bind-Value="_classeId" Label="@Loc["Macs_FilterClass"]"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+            <MudSelectItem T="string" Value="@("")">@Loc["Macs_AllClasses"]</MudSelectItem>
+            @foreach (var c in _classes)
+            {
+                <MudSelectItem T="string" Value="@c">@c</MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+</MudGrid>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+else if (!_macs.Any())
+{
+    <MudAlert Severity="Severity.Info">@Loc["Macs_NoData"]</MudAlert>
+}
+else
+{
+    <MudTable T="AlumneMacDto" Items="_filtrats" Dense="true" Hover="true"
+              Breakpoint="Breakpoint.Sm" Elevation="2" Striped="true">
+        <HeaderContent>
+            <MudTh>@Loc["Macs_ColStudent"]</MudTh>
+            <MudTh>@Loc["Macs_ColClass"]</MudTh>
+            <MudTh>@Loc["Macs_ColMac"]</MudTh>
+            <MudTh>@Loc["Macs_ColDevice"]</MudTh>
+            <MudTh>@Loc["Macs_ColFirstSeen"]</MudTh>
+            <MudTh Style="width:56px"></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="@Loc["Macs_ColStudent"].Value">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    @if (context.FotoUrl is not null)
+                    {
+                        <MudAvatar Style="width:32px;height:32px">
+                            <MudImage Src="@context.FotoUrl"
+                                      Style="width:32px;height:32px;object-fit:cover" />
+                        </MudAvatar>
+                    }
+                    else
+                    {
+                        <MudAvatar Color="Color.Primary" Style="width:32px;height:32px;font-size:0.85rem">
+                            @((context.StudentCognoms?[..1] ?? "?") + (context.StudentNom?[..1] ?? ""))
+                        </MudAvatar>
+                    }
+                    <MudText Typo="Typo.body2">
+                        @context.StudentCognoms, @context.StudentNom
+                    </MudText>
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="@Loc["Macs_ColClass"].Value">
+                <MudText Typo="Typo.body2">@context.ClassName</MudText>
+            </MudTd>
+            <MudTd DataLabel="@Loc["Macs_ColMac"].Value">
+                <MudText Typo="Typo.caption" Style="font-family:monospace;letter-spacing:0.05em">
+                    @context.Mac
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="@Loc["Macs_ColDevice"].Value">
+                <MudText Typo="Typo.body2">@(context.Dispositiu ?? "—")</MudText>
+            </MudTd>
+            <MudTd DataLabel="@Loc["Macs_ColFirstSeen"].Value">
+                <MudText Typo="Typo.body2">
+                    @context.PrimerCopVist.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline"
+                               Size="Size.Small" Color="Color.Error"
+                               title="@Loc["Macs_DeleteTooltip"].Value"
+                               OnClick="() => ConfirmarEliminacio(context)" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4">
+                @Loc["Macs_NoData"]
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<AlumneMacDto>      _macs    = [];
+    private List<string>            _classes = [];
+    private bool   _loading  = true;
+    private string _cerca    = "";
+    private string _classeId = "";
+
+    private List<AlumneMacDto> _filtrats => _macs
+        .Where(m => (string.IsNullOrWhiteSpace(_cerca) ||
+                     $"{m.StudentNom} {m.StudentCognoms}".Contains(_cerca, StringComparison.OrdinalIgnoreCase) ||
+                     m.Mac.Contains(_cerca, StringComparison.OrdinalIgnoreCase) ||
+                     m.StudentEmail.Contains(_cerca, StringComparison.OrdinalIgnoreCase))
+                 && (string.IsNullOrEmpty(_classeId) || m.ClassName == _classeId))
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserState.IsAdmin) return;
+        Api.SetToken(UserState.Token!);
+        _macs    = await Api.GetExamenMacsAsync() ?? [];
+        _classes = _macs.Select(m => m.ClassName).Distinct().OrderBy(c => c).ToList();
+        _loading = false;
+    }
+
+    private async Task ConfirmarEliminacio(AlumneMacDto mac)
+    {
+        var confirm = await Dialog.ShowMessageBox(
+            Loc["Macs_DeleteTitle"].Value,
+            Loc["Macs_DeleteMsg", mac.Mac, mac.StudentNom, mac.StudentCognoms].Value,
+            yesText: Loc["Action_Delete"].Value,
+            cancelText: Loc["Action_Cancel"].Value);
+        if (confirm == true)
+            await Eliminar(mac);
+    }
+
+    private async Task Eliminar(AlumneMacDto mac)
+    {
+        var ok = await Api.DeleteExamenMacAsync(mac.Id);
+        if (ok)
+        {
+            _macs.RemoveAll(m => m.Id == mac.Id);
+            Snackbar.Add(Loc["Macs_Deleted"].Value, Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add(Loc["Msg_Error"].Value, Severity.Error);
+        }
+    }
+}

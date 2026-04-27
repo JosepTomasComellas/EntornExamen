@@ -1378,6 +1378,23 @@ app.MapPost("/api/examen/importar-alumnes", async (HttpRequest httpReq,
         : Results.Ok(result);
 }).RequireAuthorization();
 
+// ── MACs ──────────────────────────────────────────────────────────────────────
+app.MapGet("/api/examen/macs", async (IExamenService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    var macs = await svc.GetMacsAsync(true);
+    return Results.Ok(macs);
+}).RequireAuthorization();
+
+app.MapDelete("/api/examen/macs/{id:int}", async (int id, IExamenService svc,
+    ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    return await svc.DeleteMacAsync(id, true)
+        ? Results.NoContent()
+        : Results.NotFound();
+}).RequireAuthorization();
+
 app.MapPost("/api/examen/importar-fotos", async (HttpRequest httpReq,
     IExamenService svc, IConfiguration config, ClaimsPrincipal user) =>
 {

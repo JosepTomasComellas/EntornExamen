@@ -258,7 +258,8 @@ public record CheckinAlumneInfo(
     int StudentId, string Nom, string Cognoms, string Classe, string? FotoUrl);
 
 public record CheckinSessioInfo(
-    int SessioId, string? Titol, string? Descripcio, string? MissatgeActiu);
+    int SessioId, string? Titol, string? Descripcio, string? MissatgeActiu,
+    int IntervalSegons = 30);
 
 // ─── Esdeveniments DHCP / DNS ────────────────────────────────────────────────
 public record DhcpEventRequest(string Mac, string? Ip, string Event);  // "connected" | "disconnected"
@@ -283,6 +284,13 @@ public record ImportacioAlumnesResult(
 
 public record ImportacioFotosResult(
     int Importades, List<string> NoTrobades, List<string> Errors);
+
+// ─── Dispositius MAC ─────────────────────────────────────────────────────────
+public record AlumneMacDto(
+    int Id, int StudentId,
+    string StudentNom, string StudentCognoms, string StudentEmail,
+    string ClassName, string Mac, string? Dispositiu,
+    DateTime PrimerCopVist, string? FotoUrl);
 
 // ─── Events SignalR (publicats per Redis) ─────────────────────────────────────
 public record ExamenEventAlumne(

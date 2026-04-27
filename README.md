@@ -1,4 +1,4 @@
-# EntornExamen + AutoCo · v1.0.0
+# EntornExamen + AutoCo · v1.1.0
 
 Sistema integrat en dues parts:
 - **EntornExamen** — control de presència en temps real durant exàmens sobre xarxa WiFi aïllada
@@ -200,7 +200,9 @@ EntornExamen/
 │   │   └── ExamenRedisSubscriber.cs      # Nou: subscriptor Redis
 │   └── Components/Pages/
 │       ├── Examen/Portal.razor           # Nou: /examen (alumne)
-│       └── Professor/Examen.razor        # Nou: /professor/examen
+│       ├── Examen/Portal.razor           # /examen (alumne)
+│       ├── Professor/Examen.razor        # /professor/examen
+│       └── Admin/ExamenMacs.razor        # Nou v1.1.0: /admin/examen-macs
 ├── shared/Dtos.cs                    # + DTOs Entorn Examen
 ├── scripts/examen/                   # Configuració DHCP + DNS
 │   ├── dhcp-hook.sh
@@ -218,7 +220,7 @@ EntornExamen/
 
 ```bash
 dotnet test AutoCo.Tests/
-# Passed: 26 — 16 de ResultsService + 10 de ExamenService
+# Passed: 33 — 16 de ResultsService + 17 de ExamenService
 ```
 
 ---
@@ -269,6 +271,20 @@ ActivityTemplate
 ---
 
 ## Changelog
+
+### v1.1.0 (2026-04-26)
+- Internacionalització completa del plafó professor i portal alumne (català / castellà)
+- Pàgina d'administració `/admin/examen-macs` per gestionar dispositius registrats
+- Foto de l'alumne al drawer del plafó professor
+- Filtre per nom i estat al plafó professor
+- Botó "REOBRIR SESSIÓ" al plafó professor
+- Correcció `FotoUrl`: comprova existència del fitxer abans de retornar la URL
+- Correcció timer portal: `Dispose()` síncron, no `DisposeAsync()`
+- Correcció dades obsoletes al drawer (`_alumneSeleccionat` actualitzat en temps real)
+- `IntervalSegons` dinàmic des del servidor (no codificat al portal)
+- `AlumneMacDto` nou al shared Dtos
+- Endpoint `GET /api/examen/macs` i `DELETE /api/examen/macs/{id}` (admin)
+- 7 nous tests (17 en total per ExamenService, 33 en total)
 
 ### v1.0.0 (2026-04-26)
 - Implementació inicial de l'Entorn Examen sobre la base AutoCo v2.2.3

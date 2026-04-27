@@ -2,36 +2,34 @@
 @rendermode InteractiveServer
 @inject ApiClient Api
 @inject ExamenNotificationService ExamenNotif
-@inject IJSRuntime JS
+@inject IStringLocalizer<SharedResources> Loc
 @implements IDisposable
 
-<PageTitle>Entorn Examen — Salesians de Sarrià</PageTitle>
+<PageTitle>@Loc["ExamenPortal_Title"] — Salesians de Sarrià</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
 
     @if (_fase == Fase.Email)
     {
-        <!-- Pas 1: introducció de l'email -->
         <MudCard Elevation="6" Class="pa-6">
             <MudCardContent>
                 <MudStack Spacing="4" AlignItems="AlignItems.Center">
                     <MudImage Src="/images/logo2.png" Height="60" />
                     <MudText Typo="Typo.h5" Align="Align.Center">
-                        <strong>Entorn d'Examen</strong>
+                        <strong>@Loc["ExamenPortal_Title"]</strong>
                     </MudText>
                     <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
-                        Salesians de Sarrià — Dept. d'Informàtica
+                        @Loc["ExamenPortal_Subtitle"]
                     </MudText>
 
                     <MudDivider />
 
                     <MudText Typo="Typo.body1" Align="Align.Center">
-                        Introdueix el teu correu corporatiu per identificar-te.
+                        @Loc["ExamenPortal_EmailPrompt"]
                     </MudText>
 
                     <MudTextField @bind-Value="_email"
-                                  Label="Correu corporatiu"
-                                  Placeholder="nom.cognom@sarria.salesians.cat"
+                                  Label="@Loc["ExamenPortal_EmailLabel"]"
                                   InputType="InputType.Email"
                                   FullWidth="true"
                                   Variant="Variant.Outlined"
@@ -44,7 +42,7 @@
                         <MudAlert Severity="Severity.Info" Dense="true"
                                   OnClick="@(() => { _email = _suggeriment; _suggeriment = null; })"
                                   Style="cursor:pointer;width:100%">
-                            Vols dir: <strong>@_suggeriment</strong>? (clica per confirmar)
+                            @Loc["ExamenPortal_SuggestEmail", _suggeriment]
                         </MudAlert>
                     }
 
@@ -57,8 +55,14 @@
                                Size="Size.Large" OnClick="ValidarEmail"
                                Disabled="_carregant"
                                StartIcon="@Icons.Material.Filled.Login">
-                        @if (_carregant) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
-                        else { <span>CONTINUAR</span> }
+                        @if (_carregant)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        }
+                        else
+                        {
+                            <span>@Loc["ExamenPortal_Continue"]</span>
+                        }
                     </MudButton>
                 </MudStack>
             </MudCardContent>
@@ -67,7 +71,6 @@
 
     @if (_fase == Fase.ConfirmacioMac)
     {
-        <!-- Pas 2b: MAC nova, demanar confirmació -->
         <MudCard Elevation="6" Class="pa-6">
             <MudCardContent>
                 <MudStack Spacing="4" AlignItems="AlignItems.Center">
@@ -75,11 +78,10 @@
                              Color="Color.Warning" Size="Size.Large"
                              Style="font-size:4rem" />
                     <MudText Typo="Typo.h6" Align="Align.Center">
-                        Nou dispositiu detectat
+                        @Loc["ExamenPortal_NewDevice"]
                     </MudText>
                     <MudText Typo="Typo.body2" Align="Align.Center">
-                        Aquest és el primer cop que et connectes des d'aquest dispositiu.
-                        La teva adreça MAC s'associarà al teu compte.
+                        @Loc["ExamenPortal_NewDeviceInfo"]
                     </MudText>
                     <MudChip T="string" Color="Color.Secondary" Size="Size.Medium">
                         @_macObtinguda
@@ -93,12 +95,18 @@
                     <MudStack Row="true" Spacing="2">
                         <MudButton Variant="Variant.Outlined" Color="Color.Default"
                                    OnClick="@(() => { _fase = Fase.Email; _errorCheckin = null; })">
-                            Cancel·lar
+                            @Loc["Action_Cancel"]
                         </MudButton>
                         <MudButton Variant="Variant.Filled" Color="Color.Warning"
                                    OnClick="FerCheckin" Disabled="_carregant">
-                            @if (_carregant) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
-                            else { <span>CONFIRMAR I REGISTRAR</span> }
+                            @if (_carregant)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            }
+                            else
+                            {
+                                <span>@Loc["ExamenPortal_ConfirmReg"]</span>
+                            }
                         </MudButton>
                     </MudStack>
                 </MudStack>
@@ -108,12 +116,10 @@
 
     @if (_fase == Fase.Connectat && _checkinResp is not null)
     {
-        <!-- Pas 3: confirmació de connexió -->
         <MudCard Elevation="6" Class="pa-4">
             <MudCardContent>
                 <MudStack Spacing="3" AlignItems="AlignItems.Center">
 
-                    <!-- Foto o avatar -->
                     @if (_checkinResp.Alumne.FotoUrl is not null)
                     {
                         <MudAvatar Style="width:96px;height:96px">
@@ -152,23 +158,24 @@
 
                     <MudDivider />
 
-                    <!-- Estat de connexió -->
                     <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
                         <div style="width:14px;height:14px;border-radius:50%;background:#22c55e;
                                     animation: pulse-green 1.5s infinite"></div>
                         <MudText Typo="Typo.body1" Color="Color.Success">
-                            <strong>CONNECTAT</strong>
+                            <strong>@Loc["ExamenPortal_Connected"]</strong>
                         </MudText>
                     </MudStack>
 
                     <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Últim check-in: @_ultimCheckin.ToLocalTime().ToString("HH:mm:ss")
-                        &nbsp;· Propera actualització en @_segonsRestants s
+                        @Loc["ExamenPortal_LastCheckin",
+                             _ultimCheckin.ToLocalTime().ToString("HH:mm:ss"),
+                             _segonsRestants]
                     </MudText>
 
-                    <MudProgressLinear Value="@(100 - _segonsRestants * 100 / CheckinIntervalSegons)"
-                                       Color="Color.Success" Rounded="true" Size="Size.Small"
-                                       Style="width:100%" />
+                    <MudProgressLinear
+                        Value="@(CheckinInterval > 0 ? (100 - _segonsRestants * 100 / CheckinInterval) : 0)"
+                        Color="Color.Success" Rounded="true" Size="Size.Small"
+                        Style="width:100%" />
                 </MudStack>
             </MudCardContent>
         </MudCard>
@@ -181,7 +188,7 @@
     <TitleContent>
         <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
             <MudIcon Icon="@Icons.Material.Filled.Campaign" Color="Color.Warning" />
-            <MudText Typo="Typo.h6">Missatge del professor</MudText>
+            <MudText Typo="Typo.h6">@Loc["ExamenPortal_TeacherMsg"]</MudText>
         </MudStack>
     </TitleContent>
     <DialogContent>
@@ -192,7 +199,7 @@
     <DialogActions>
         <MudButton Variant="Variant.Filled" Color="Color.Warning"
                    OnClick="@(() => _mostrarMissatge = false)">
-            He llegit el missatge
+            @Loc["ExamenPortal_ReadMsg"]
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -200,10 +207,10 @@
 @code {
     private enum Fase { Email, ConfirmacioMac, Connectat }
 
-    private const int CheckinIntervalSegons = 30;
+    private int CheckinInterval => _checkinResp?.Sessio.IntervalSegons ?? 30;
 
-    private Fase _fase = Fase.Email;
-    private string _email      = "";
+    private Fase    _fase = Fase.Email;
+    private string  _email        = "";
     private string? _suggeriment;
     private string? _errorEmail;
     private string? _errorCheckin;
@@ -212,7 +219,7 @@
 
     private CheckinResponse? _checkinResp;
     private DateTime _ultimCheckin;
-    private int      _segonsRestants = CheckinIntervalSegons;
+    private int      _segonsRestants;
     private System.Threading.Timer? _timer;
 
     private bool   _mostrarMissatge;
@@ -220,25 +227,9 @@
 
     private Func<string, object, Task>? _alumneHandler;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnInitialized()
     {
-        if (!firstRender) return;
-        // Obté la MAC via ARP del costat del servidor — no des del navegador
-        _macObtinguda = await ObtenirMacAsync();
-    }
-
-    private async Task<string> ObtenirMacAsync()
-    {
-        // La MAC s'obté al servidor via la IP del client
-        // En una xarxa local tancada, usem un placeholder o la IP
-        // La MAC real la proporciona el backend DHCP monitor
-        try
-        {
-            var ip = await JS.InvokeAsync<string>("eval",
-                "window.location.hostname");
-            return $"00:00:00:00:00:00"; // el backend la resoldrà via DHCP
-        }
-        catch { return "00:00:00:00:00:00"; }
+        _macObtinguda = "00:00:00:00:00:00";
     }
 
     private void OnEmailKeyDown(KeyboardEventArgs e)
@@ -253,7 +244,6 @@
 
         var email = _email.Trim().ToLower();
 
-        // Suggeriment si falta el domini
         if (!email.Contains('@'))
         {
             _suggeriment = $"{email}@sarria.salesians.cat";
@@ -261,20 +251,12 @@
             return;
         }
 
-        if (!email.EndsWith("@sarria.salesians.cat"))
-        {
-            _errorEmail = "El correu ha d'acabar en @sarria.salesians.cat";
-            StateHasChanged();
-            return;
-        }
-
-        // Prova directament check-in (si la MAC ja era coneguda)
         await FerCheckin();
     }
 
     private async Task FerCheckin()
     {
-        _carregant   = true;
+        _carregant    = true;
         _errorCheckin = null;
         StateHasChanged();
 
@@ -285,27 +267,24 @@
 
         if (error is not null)
         {
-            _errorEmail  = error;
+            _errorEmail   = error;
             _errorCheckin = error;
             _fase = Fase.Email;
         }
         else if (resp is not null)
         {
-            _checkinResp = resp;
-            _ultimCheckin = DateTime.UtcNow;
-            _fase = Fase.Connectat;
+            _checkinResp    = resp;
+            _ultimCheckin   = DateTime.UtcNow;
+            _segonsRestants = resp.Sessio.IntervalSegons;
+            _fase           = Fase.Connectat;
 
-            // Mostra missatge actiu si n'hi ha
             if (!string.IsNullOrWhiteSpace(resp.Sessio.MissatgeActiu))
             {
                 _missatgeProfessor = resp.Sessio.MissatgeActiu;
                 _mostrarMissatge   = true;
             }
 
-            // Subscriu a notificacions de l'alumne
             SubscriuNotificacions(resp.Alumne.StudentId);
-
-            // Inicia el timer de check-in automàtic
             IniciaTimer();
         }
 
@@ -324,11 +303,11 @@
                     await InvokeAsync(StateHasChanged);
                     break;
                 case "SessioTancadaGlobal":
-                    // Torna al pas inicial amb avís
                     _checkinResp = null;
                     _fase        = Fase.Email;
-                    _errorEmail  = "La sessió d'examen ha finalitzat.";
-                    _ = _timer?.DisposeAsync();
+                    _errorEmail  = Loc["ExamenPortal_SessionEnded"].Value;
+                    _timer?.Dispose();
+                    _timer = null;
                     await InvokeAsync(StateHasChanged);
                     break;
             }
@@ -339,15 +318,14 @@
     private void IniciaTimer()
     {
         _timer?.Dispose();
-        _segonsRestants = CheckinIntervalSegons;
+        _segonsRestants = CheckinInterval;
 
         _timer = new System.Threading.Timer(async _ =>
         {
             _segonsRestants--;
             if (_segonsRestants <= 0)
             {
-                _segonsRestants = CheckinIntervalSegons;
-                // Auto check-in
+                _segonsRestants = CheckinInterval;
                 if (_checkinResp is not null)
                 {
                     var (resp, _) = await Api.ExamenCheckinAsync(

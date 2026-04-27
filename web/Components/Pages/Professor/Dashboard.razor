@@ -44,6 +44,14 @@
                Href="/professor/examen">
         Entorn Examen
     </MudButton>
+    @if (UserState.IsAdmin)
+    {
+        <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                   StartIcon="@Icons.Material.Filled.Devices"
+                   Href="/admin/examen-macs">
+            @Loc["Dash_ExamenMacs"]
+        </MudButton>
+    }
 </MudStack>
 
 @if (_loading)
