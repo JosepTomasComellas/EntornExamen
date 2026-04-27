@@ -123,7 +123,6 @@ services:
       dockerfile: Dockerfile
     container_name: entornexamen-nginx
     ports:
-      - "80:80"
       - "4445:443"
     volumes:
       - ./nginx/ssl:/etc/nginx/ssl
