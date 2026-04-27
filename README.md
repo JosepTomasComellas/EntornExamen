@@ -1,16 +1,12 @@
-# EntornExamen + AutoCo · v1.3.1
+# EntornExamen · v2.0.0
 
-Sistema integrat en dues parts:
-- **EntornExamen** — control de presència en temps real durant exàmens sobre xarxa WiFi aïllada
-- **AutoCo** — autoavaluació i coavaluació entre iguals (base v2.2.3)
+Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 
-Salesians de Sarrià — Departament d'Informàtica · CFGS ASIX
+**Salesians de Sarrià — Departament d'Informàtica · CFGS ASIX**
 
 ---
 
-## Entorn Examen
-
-### Funcionament general
+## Com funciona
 
 ```
 [Alumnes] → WiFi "Entorn_Examen" (192.168.100.0/24, sense internet)
@@ -20,90 +16,56 @@ Salesians de Sarrià — Departament d'Informàtica · CFGS ASIX
           ├── isc-dhcp-server  → /var/lib/dhcp/dhcpd.leases
           ├── BIND9 (DNS)      → /var/log/named/queries.log
           └── Docker Compose
-                ├── nginx   (proxy SSL)
-                ├── api     (ASP.NET Core 10 Minimal API)
-                ├── web     (Blazor Server + MudBlazor)
-                ├── db      (SQL Server 2022 Express)
-                └── redis   (Redis 7 Alpine)
+                ├── entornexamen-nginx   (proxy SSL)
+                ├── entornexamen-api     (ASP.NET Core 10)
+                ├── entornexamen-web     (Blazor Server + MudBlazor)
+                ├── entornexamen-db      (SQL Server 2022 Express)
+                └── entornexamen-redis   (Redis 7 Alpine)
 ```
 
-L'alumne accedeix a **`https://192.168.100.1/examen`** i s'identifica amb el seu email corporatiu. La seva MAC s'associa al compte automàticament. A partir d'aquí, fa check-in cada 30 s i el professor veu l'estat de tota la classe en temps real.
+L'alumne accedeix a **`https://192.168.100.1/examen`** i introdueix el seu correu corporatiu.
+El backend detecta la seva IP des de `HttpContext` i la vincula automàticament al registre DHCP corresponent.
+A partir d'aquí, fa check-in cada 30 s i el professor veu l'estat de tota la classe en temps real.
 
-### Funcionalitats
+**Els alumnes no necessiten contrasenya.**
 
-**Professor (`/professor/examen`)**
+---
+
+## Funcionalitats
+
+### Professor (`/professor/examen`)
 - Inicia / tanca / reobre sessions d'examen per classe
-- Monitoratge en temps real: estat de cada alumne (connectat / sense check-in / desconnectat / no connectat)
-- Alertes de desconnexió amb **so** (Web Audio API, sense fitxers externs)
+- Monitoratge en temps real: estat de cada alumne (connectat / sense check-in / desconnectat)
+- Alertes de desconnexió amb so (Web Audio API, sense fitxers externs)
 - Alertes de peticions DNS externes sospitoses
 - Missatges push: apareixen com a diàleg obligatori a la pantalla de l'alumne
 - Exportació CSV de la sessió
 - Mode presentació (pantalla completa)
 
-**Alumne (`/examen`)**
-- Identificació per email corporatiu `@sarria.salesians.cat`
+### Alumne (`/examen`)
+- Identificació per correu corporatiu `@sarria.salesians.cat` (sense contrasenya)
 - Check-in automàtic cada 30 s
 - Rebuda de missatges del professor (diàleg emergent obligatori)
 
-**Importació (Admin)**
-- Alumnes: fitxer XLS/HTML exportat d'EPSS (auto-detecta format)
-- Fotos: ZIP amb `{DNI_numèric}.jpg` descarregat des d'EPSS
-
-### Arquitectura de dades (nous models)
-
-```
-Student ──< AlumneMac           (un per dispositiu; MAC normalitzada lowercase)
-Class   ──< SessioExamen        (màx. 1 activa per classe)
-SessioExamen ──< RegistreConnexio ──< PeticioTdns
-Student      ──< RegistreConnexio   (null si MAC desconeguda)
-```
-
-### Estats de connexió
-
-| Estat | Color | Condició |
-|-------|-------|---------|
-| `Connectat` | 🟢 Verd | Check-in < 30 s |
-| `SenseCheckin` | 🟡 Groc | Connectat però sense check-in recent |
-| `Desconnectat` | 🔴 Vermell | DHCP ha notificat desconnexió |
-| `NoConnectat` | ⚫ Gris | Precarregat però mai connectat |
-
-### Notificacions en temps real (Redis pub/sub)
-
-| Canal Redis | Receptor | Events |
-|------------|---------|--------|
-| `examen:sessio:{id}` | Professor | `AlumneConnectat`, `AlumneDesconnectat`, `NouCheckin`, `NovaPeticioExterna`, `MacDesconeguda`, `MissatgeActualitzat` |
-| `examen:alumne:{id}` | Alumne | `MissatgeProfessor`, `SessioTancadaGlobal` |
-
-### Endpoints de l'API (Entorn Examen)
-
-| Mètode | URL | Auth | Descripció |
-|--------|-----|------|-----------|
-| `GET` | `/api/examen/sessions` | JWT | Llista sessions |
-| `POST` | `/api/examen/sessions` | JWT | Crea sessió (409 si ja n'hi ha d'activa) |
-| `GET` | `/api/examen/sessions/{id}/dashboard` | JWT | Estat complet |
-| `PUT` | `/api/examen/sessions/{id}/tancar` | JWT | Tanca la sessió |
-| `PUT` | `/api/examen/sessions/{id}/reobrir` | JWT | Reobre la sessió |
-| `PUT` | `/api/examen/sessions/{id}/missatge` | JWT | Envia missatge push |
-| `DELETE` | `/api/examen/sessions/{id}/missatge` | JWT | Esborra el missatge |
-| `GET` | `/api/examen/sessions/{id}/exportar` | JWT | Exporta CSV |
-| `POST` | `/api/examen/checkin` | Cap | Check-in alumne |
-| `POST` | `/api/examen/dhcp/event` | Cap | Event DHCP (hook) |
-| `POST` | `/api/examen/dns/event` | Cap | Event DNS |
-| `POST` | `/api/examen/importar-alumnes` | JWT (admin) | Importa alumnes HTML/XLS (Esfer@) |
-| `POST` | `/api/examen/importar-alumnes-xls` | JWT (admin) | Importa alumnes XLS/HTML (EPSS) |
-| `POST` | `/api/examen/importar-fotos` | JWT (admin) | Importa fotos ZIP ({DNI}.jpg) |
+### Admin
+- Gestió de professors, classes i alumnes
+- Importació d'alumnes des d'EPSS (XLS/HTML auto-detectat)
+- Importació de fotos (ZIP amb `{DNI_numèric}.jpg`)
+- Còpies de seguretat JSON (export/import)
+- Estadístiques d'accessos de professors
+- Gestió de dispositius registrats (`/admin/examen-macs`)
 
 ---
 
-## Instal·lació
+## Instal·lació des de zero
 
 ### Requisits del servidor
 
 - VM Ubuntu 24.04 (recomanat sobre Proxmox)
 - Docker + Docker Compose v2
-- `isc-dhcp-server` per a la xarxa d'examen
-- `bind9` com a servidor DNS local
-- Interfície de xarxa dedicada (192.168.100.0/24)
+- `isc-dhcp-server` (xarxa d'examen 192.168.100.0/24)
+- `bind9` (DNS local)
+- Interfície de xarxa dedicada per a l'Entorn Examen
 
 ### 1. Clonar el repositori
 
@@ -121,23 +83,22 @@ nano .env
 
 | Variable | Obligatori | Descripció |
 |----------|:----------:|-----------|
-| `MSSQL_SA_PASSWORD` | ✓ | Contrasenya SQL Server |
-| `JWT_SECRET` | ✓ | Secret JWT (≥ 32 caràcters) |
-| `ADMIN_EMAIL` | ✓ | Email administrador inicial |
-| `ADMIN_PASSWORD` | ✓ | Contrasenya administrador |
-| `ADMIN_NOM` | ✓ | Nom administrador |
+| `MSSQL_SA_PASSWORD` | ✓ | Contrasenya SQL Server (mínim 8 car., majúscules + números) |
+| `JWT_SECRET` | ✓ | Secret JWT (mínim 32 caràcters) |
+| `ADMIN_EMAIL` | ✓ | Correu de l'administrador inicial |
+| `ADMIN_PASSWORD` | ✓ | Contrasenya de l'administrador |
+| `ADMIN_NOM` | ✓ | Nom de l'administrador |
+| `ADMIN_COGNOMS` | | Cognoms de l'administrador |
 | `EXAMEN_DOMINI_EMAIL` | | Domini acceptat (per defecte: `sarria.salesians.cat`) |
-| `EXAMEN_CHECKIN_INTERVAL_SECONDS` | | Interval check-in (per defecte: `30`) |
-| `SMTP_HOST` | | Servidor SMTP (opcional) |
+| `EXAMEN_CHECKIN_INTERVAL_SECONDS` | | Interval check-in en segons (per defecte: `30`) |
+| `SMTP_HOST` | | Servidor SMTP (opcional, per a correu de professors) |
 
 ### 3. Configurar el servidor DHCP
 
 ```bash
 sudo cp scripts/examen/dhcpd.conf /etc/dhcp/dhcpd.conf
-
 sudo cp scripts/examen/dhcp-hook.sh /etc/dhcp/dhcpd-enter-hooks.d/notifica-api
 sudo chmod +x /etc/dhcp/dhcpd-enter-hooks.d/notifica-api
-
 sudo systemctl restart isc-dhcp-server
 ```
 
@@ -146,10 +107,8 @@ sudo systemctl restart isc-dhcp-server
 ```bash
 sudo cat scripts/examen/named.conf.local >> /etc/bind/named.conf.local
 sudo cp scripts/examen/db.examen.local /etc/bind/db.examen.local
-
 sudo mkdir -p /var/log/named
 sudo chown bind:bind /var/log/named
-
 sudo systemctl restart bind9
 ```
 
@@ -159,7 +118,50 @@ sudo systemctl restart bind9
 docker compose up --build -d
 ```
 
-### 6. Actualitzar (desplegaments posteriors)
+---
+
+## Neteja completa i reinici
+
+Útil quan cal partir d'un estat completament net (canvi de versió major, base de dades corrupta, etc.).
+
+> ⚠️ **Esborrarà totes les dades**: classes, alumnes, sessions, connexions.
+
+```bash
+cd /docker/EntornExamen
+
+# 1. Atura i elimina tots els contenidors
+docker compose down
+
+# 2. Elimina els volums (BD, Redis, claus DataProtection, còpies de seguretat)
+docker volume rm \
+  entornexamen_db-data \
+  entornexamen_redis-data \
+  entornexamen_dp-keys \
+  entornexamen_api-backups \
+  entornexamen_fotos-alumnes
+
+# 3. Reconstrueix les imatges des de zero
+docker compose build --no-cache
+
+# 4. Arrenca
+docker compose up -d
+
+# 5. Comprova que tot ha arrencat
+docker compose ps
+docker compose logs -f
+```
+
+En arrencar per primera vegada, la BD `EntornExamen` es crea automàticament i l'admin es configura amb les credencials del `.env`.
+
+---
+
+## Actualització normal (sense esborrar dades)
+
+```bash
+bash /docker/EntornExamen/deploy/server-update.sh
+```
+
+O manualment:
 
 ```bash
 cd /docker/EntornExamen
@@ -180,40 +182,107 @@ docker compose up --build -d
 
 ```
 EntornExamen/
-├── api/
+├── api/                          # ASP.NET Core 10 Minimal API
 │   ├── Data/
-│   │   ├── AppDbContext.cs
+│   │   ├── AppDbContext.cs       # EF Core (EnsureCreated — sense migracions)
+│   │   ├── SeedData.cs           # Admin inicial des de .env
 │   │   └── Models/
-│   │       ├── AlumneMac.cs          # Nou: MAC ↔ Alumne
-│   │       ├── SessioExamen.cs       # Nou: sessió d'examen
-│   │       ├── RegistreConnexio.cs   # Nou: registre connexió + EstatConnexio
-│   │       └── PeticioTdns.cs        # Nou: peticions DNS
+│   │       ├── Professor.cs
+│   │       ├── Class.cs
+│   │       ├── Student.cs        # PasswordHash nullable (alumnes sense contrasenya)
+│   │       ├── AlumneMac.cs      # MAC ↔ Alumne
+│   │       ├── SessioExamen.cs   # Sessió d'examen per classe
+│   │       ├── RegistreConnexio.cs  # Connexió per IP/MAC
+│   │       └── PeticioTdns.cs   # Peticions DNS sospitoses
 │   ├── Hubs/
-│   │   └── ExamenHub.cs              # Nou: publicador Redis
+│   │   └── ExamenHub.cs          # Publicador Redis (temps real)
 │   ├── Services/
-│   │   ├── ExamenService.cs          # Nou: lògica de negoci
-│   │   ├── DhcpMonitorService.cs     # Nou: monitor dhcpd.leases
-│   │   └── DnsMonitorService.cs      # Nou: monitor dns-queries.log
-│   └── Program.cs
-├── web/
+│   │   ├── ExamenService.cs      # Lògica sessions + check-in per IP
+│   │   ├── DhcpMonitorService.cs # Monitor dhcpd.leases (IHostedService)
+│   │   ├── DnsMonitorService.cs  # Monitor dns-queries.log (IHostedService)
+│   │   ├── AuthService.cs        # Login professors (JWT)
+│   │   ├── ClassService.cs       # Classes + alumnes
+│   │   ├── BackupService.cs      # Export/import JSON
+│   │   └── EmailService.cs       # SMTP (professors)
+│   └── Program.cs                # Endpoints + DI
+├── web/                          # Blazor Server + MudBlazor
+│   ├── Components/Pages/
+│   │   ├── Examen/Portal.razor   # /examen (alumne, sense auth)
+│   │   ├── Professor/
+│   │   │   ├── Dashboard.razor   # /professor/dashboard
+│   │   │   ├── Examen.razor      # /professor/examen (plafó professor)
+│   │   │   ├── Classes.razor     # /professor/classes
+│   │   │   └── Alumnes.razor     # /professor/alumnes/{id}
+│   │   └── Admin/
+│   │       ├── Professors.razor  # /admin/professors
+│   │       ├── ExamenMacs.razor  # /admin/examen-macs
+│   │       ├── Backup.razor      # /admin/backup
+│   │       └── Estadistiques.razor # /admin/estadistiques
 │   ├── Services/
-│   │   ├── ExamenNotificationService.cs  # Nou: bus intern notificacions
-│   │   └── ExamenRedisSubscriber.cs      # Nou: subscriptor Redis
-│   └── Components/Pages/
-│       ├── Examen/Portal.razor           # Nou: /examen (alumne)
-│       ├── Examen/Portal.razor           # /examen (alumne)
-│       ├── Professor/Examen.razor        # /professor/examen
-│       └── Admin/ExamenMacs.razor        # Nou v1.1.0: /admin/examen-macs
-├── shared/Dtos.cs                    # + DTOs Entorn Examen
-├── scripts/examen/                   # Configuració DHCP + DNS
+│   │   ├── ApiClient.cs          # Client HTTP cap a l'API
+│   │   ├── UserStateService.cs   # Sessió Blazor (JWT professors)
+│   │   ├── ExamenNotificationService.cs  # Bus intern notificacions
+│   │   └── ExamenRedisSubscriber.cs      # Subscriptor Redis
+│   └── Resources/
+│       └── DictionaryLocalizer.cs  # i18n estàtica (ca/es)
+├── shared/
+│   ├── Dtos.cs                   # Tots els DTOs compartits
+│   └── AppVersion.cs             # Versió actual
+├── AutoCo.Tests/
+│   └── ExamenServiceTests.cs     # Tests unitaris ExamenService
+├── scripts/examen/               # Configuració DHCP + DNS
 │   ├── dhcp-hook.sh
 │   ├── dhcpd.conf
 │   ├── named.conf.local
 │   └── db.examen.local
-├── AutoCo.Tests/
-│   └── ExamenServiceTests.cs         # Nou: 10 tests ExamenService
+├── nginx/                        # Proxy invers SSL
+├── deploy/                       # Scripts de desplegament
+│   └── server-update.sh
+├── .env.example
 └── docker-compose.yml
 ```
+
+---
+
+## Model de dades
+
+```
+Professor ──< ProfessorLogin     (registre d'accessos)
+Class ────< Student ──< AlumneMac         (MAC ↔ correu)
+Class ────< SessioExamen ──< RegistreConnexio ──< PeticioTdns
+                              └── Student (nullable, vinculat per IP)
+```
+
+---
+
+## Notificacions en temps real (Redis pub/sub)
+
+| Canal Redis | Receptor | Events |
+|------------|---------|--------|
+| `examen:sessio:{id}` | Professor | `AlumneConnectat`, `AlumneDesconnectat`, `NouCheckin`, `NovaPeticioExterna`, `MacDesconeguda`, `MissatgeActualitzat`, `SessioTancadaGlobal` |
+| `examen:alumne:{id}` | Alumne | `MissatgeProfessor`, `SessioTancadaGlobal` |
+
+---
+
+## Endpoints principals de l'API
+
+| Mètode | URL | Auth | Descripció |
+|--------|-----|------|-----------|
+| `POST` | `/api/auth/professor` | — | Login professor |
+| `GET` | `/api/examen/sessions` | JWT | Llista sessions |
+| `POST` | `/api/examen/sessions` | JWT | Crea sessió |
+| `GET` | `/api/examen/sessions/{id}/dashboard` | JWT | Estat complet en temps real |
+| `PUT` | `/api/examen/sessions/{id}/tancar` | JWT | Tanca sessió |
+| `PUT` | `/api/examen/sessions/{id}/reobrir` | JWT | Reobre sessió |
+| `PUT` | `/api/examen/sessions/{id}/missatge` | JWT | Envia missatge push |
+| `DELETE` | `/api/examen/sessions/{id}/missatge` | JWT | Esborra missatge |
+| `GET` | `/api/examen/sessions/{id}/exportar` | JWT | Exporta CSV |
+| `POST` | `/api/examen/checkin` | — | Check-in alumne (per IP) |
+| `POST` | `/api/examen/dhcp/event` | — | Event DHCP (hook) |
+| `POST` | `/api/examen/dns/event` | — | Event DNS |
+| `GET/DELETE` | `/api/examen/macs` | JWT admin | Gestió dispositius |
+| `GET` | `/api/admin/stats` | JWT admin | Estadístiques |
+| `GET/POST` | `/api/admin/backup/*` | JWT admin | Còpies de seguretat |
 
 ---
 
@@ -221,102 +290,41 @@ EntornExamen/
 
 ```bash
 dotnet test AutoCo.Tests/
-# Passed: 33 — 16 de ResultsService + 17 de ExamenService
-```
-
----
-
-## AutoCo (base)
-
-### Funcionalitats
-
-**Professor / Admin**
-- Gestió de classes, alumnes i mòduls amb edició inline
-- Activitats d'avaluació amb criteris personalitzats i plantilles
-- Grups per drag & drop, importació/exportació CSV, duplicació creuada
-- Resultats amb filtres avançats, gràfiques, exportació CSV/Excel, informes PDF
-- Indicador de participació en temps real (Redis pub/sub)
-- Recordatoris per correu, notes per alumne, registre d'activitat
-- Codis QR per classe, mode fosc, selector de tema de color
-- Còpies de seguretat JSON, estadístiques d'ús (Admin)
-
-**Alumne**
-- Avaluació de tots els membres del grup (inclosa autoavaluació)
-- Escala E/D/C/B/A (1 / 3.5 / 5 / 7.5 / 10)
-- Desat parcial i barra de progrés
-
-### Criteris globals per defecte
-
-| Clau | Descripció |
-|------|-----------|
-| `probitat` | Probitat |
-| `autonomia` | Autonomia |
-| `responsabilitat` | Responsabilitat i Treball de qualitat |
-| `collaboracio` | Col·laboració i treball en equip |
-| `comunicacio` | Comunicació |
-
-### Model de dades AutoCo
-
-```
-Professor ──< Module ──< Activity ──< Group ──< GroupMember (Student)
-              │               ├──< ActivityCriteria
-              │               ├──< Evaluation ──< EvaluationScore
-              │               ├──< ProfessorNote
-              │               └──< ActivityLog
-Class ────────┘
-  ├──< Student ──< AlumneMac         (Entorn Examen)
-  └──< ModuleExclusion
-ActivityTemplate
 ```
 
 ---
 
 ## Changelog
 
+### v2.0.0 (2026-04-27)
+- **Desvinculació total d'AutoCo** — sistema independent i net
+- Alumnes sense contrasenya: `PasswordHash` nullable, sense generació ni enviament
+- Check-in per IP: backend llegeix `HttpContext.Connection.RemoteIpAddress`
+- Portal alumne simplificat: només demana el correu electrònic
+- Eliminades totes les funcionalitats AutoCo: activitats, mòduls, grups, avaluacions, resultats, criteris, plantilles, notes
+- Backup simplificat: només Professors / Classes / Alumnes
+- Dashboard professor reescrit centrat en sessions d'examen
+- Nomenclatura Docker: `autoco-*` → `entornexamen-*`
+- BD: `AutoCoAvaluacio` → `EntornExamen`
+- Redis prefix i LocalStorage: `autoco:` → `entornexamen:`
+- `RootNamespace` tots els projectes: `AutoCo.*` → `EntornExamen.*`
+
+### v1.4.0 (2026-04-27)
+- Importació EPSS integrada a la pàgina de gestió d'alumnes (XLS + ZIP fotos)
+- Foto de l'alumne carregable directament des de la taula d'alumnes
+
 ### v1.3.1 (2026-04-27)
-- Fix: `ImportarAlumnesXlsAsync` — suport per fitxers HTML amb extensió `.xls` (format habitual d'EPSS); s'elimina la crida duplicada a `CreateReader` que causava `HeaderException`
-- Fix: `ImportarFotosAsync` — `Regex.Replace` en LINQ no traduïble a SQL; es carreguen els DNIs a memòria prèviament
-- Instruccions pas a pas per crear el ZIP de fotos a la pàgina d'importació
-- Botó "Importar EPSS" afegit a la capçalera de Gestió de Classes
+- Fix importació EPSS: suport HTML amb extensió `.xls`
+- Fix fotos: `Regex.Replace` fora de LINQ SQL
 
-### v1.3.0 (2026-04-27)
-- Importació d'alumnes des d'EPSS: fitxer XLS natiu (ExcelDataReader), associació per email, creació automàtica de classe
-- Importació de fotos des d'EPSS: ZIP amb `{DNI_numèric}.jpg`, matching per DNI complet o part numèrica
-- Pàgina `/admin/importar-epss` amb dos panells d'importació
-- Botó "Importar EPSS" al Dashboard (admin)
-
-### v1.2.0 (2026-04-27)
-- Rebranding complet: totes les referències visibles a "AutoCo" substituïdes per "Entorn d'Examens — Salesians de Sarrià"
-- Botó "← Dashboard" al plafó d'examen (no hi havia manera de sortir quan no hi havia sessió activa)
-- `manifest.json`, `App.razor`, footer i `DictionaryLocalizer` (ca + es) actualitzats
-
-### v1.1.1 (2026-04-27)
-- Fix: `EnsureCreated()` en lloc de `Migrate()` — el projecte no té fitxers de migració EF Core i `Migrate()` fallava amb `PendingModelChangesWarning` a EF Core 9+
-
-### v1.1.0 (2026-04-26)
-- Internacionalització completa del plafó professor i portal alumne (català / castellà)
-- Pàgina d'administració `/admin/examen-macs` per gestionar dispositius registrats
-- Foto de l'alumne al drawer del plafó professor
-- Filtre per nom i estat al plafó professor
-- Botó "REOBRIR SESSIÓ" al plafó professor
-- Correcció `FotoUrl`: comprova existència del fitxer abans de retornar la URL
-- Correcció timer portal: `Dispose()` síncron, no `DisposeAsync()`
-- Correcció dades obsoletes al drawer (`_alumneSeleccionat` actualitzat en temps real)
-- `IntervalSegons` dinàmic des del servidor (no codificat al portal)
-- `AlumneMacDto` nou al shared Dtos
-- Endpoint `GET /api/examen/macs` i `DELETE /api/examen/macs/{id}` (admin)
-- 7 nous tests (17 en total per ExamenService, 33 en total)
-
-### v1.0.0 (2026-04-26)
-- Implementació inicial de l'Entorn Examen sobre la base AutoCo v2.2.3
-- Nous models: `AlumneMac`, `SessioExamen`, `RegistreConnexio`, `PeticioTdns`
-- Portal alumne `/examen` i plafó professor `/professor/examen`
-- Serveis background: `DhcpMonitorService`, `DnsMonitorService`
-- Notificacions Redis pub/sub en temps real
-- Alertes sonores via Web Audio API
-- Importació d'alumnes (HTML/XLS) i fotos (ZIP per DNI)
+### v1.0.0 – v1.3.0 (2026-04-26)
+- Implementació inicial de l'Entorn Examen
+- Models: `AlumneMac`, `SessioExamen`, `RegistreConnexio`, `PeticioTdns`
+- Portal alumne i plafó professor en temps real
+- Serveis background DHCP + DNS
+- Importació alumnes (HTML/XLS) i fotos (ZIP per DNI)
+- Internacionalització completa (ca/es)
 - Scripts de configuració DHCP i BIND9
-- 10 tests unitaris nous (26 en total)
 
 ---
 

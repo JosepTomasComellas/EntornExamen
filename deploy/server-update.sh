@@ -81,7 +81,7 @@ docker compose up -d
 echo ""
 echo "  Esperant que els serveis arranquin..."
 for i in $(seq 1 20); do
-    docker compose ps | grep -q "autoco-nginx.*Up" && break
+    docker compose ps | grep -q "entornexamen-nginx.*Up" && break
     printf "." && sleep 3
 done
 echo ""
