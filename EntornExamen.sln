@@ -5,15 +5,17 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "api", "api", "{D82C56D6-B2CD-F611-9E31-04638F7EC30E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoCo.Api", "api\AutoCo.Api.csproj", "{2C3F3E80-A642-43AE-B449-3DC874BB7467}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EntornExamen.Api", "api\EntornExamen.Api.csproj", "{2C3F3E80-A642-43AE-B449-3DC874BB7467}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shared", "shared", "{4F52FD11-658E-A102-6CD3-7D7C16FFA15B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoCo.Shared", "shared\AutoCo.Shared.csproj", "{9CF9D67B-BEF0-4E84-B1BC-9AAF5419E814}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EntornExamen.Shared", "shared\EntornExamen.Shared.csproj", "{9CF9D67B-BEF0-4E84-B1BC-9AAF5419E814}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "web", "web", "{256F4E96-6A73-9ABE-786F-840C672A50F4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoCo.Web", "web\AutoCo.Web.csproj", "{8C011A2E-88B4-43B5-9694-003ADCE3053E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EntornExamen.Web", "web\EntornExamen.Web.csproj", "{8C011A2E-88B4-43B5-9694-003ADCE3053E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EntornExamen.Tests", "EntornExamen.Tests\EntornExamen.Tests.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -61,6 +63,18 @@ Global
 		{8C011A2E-88B4-43B5-9694-003ADCE3053E}.Release|x64.Build.0 = Release|Any CPU
 		{8C011A2E-88B4-43B5-9694-003ADCE3053E}.Release|x86.ActiveCfg = Release|Any CPU
 		{8C011A2E-88B4-43B5-9694-003ADCE3053E}.Release|x86.Build.0 = Release|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x64.Build.0 = Debug|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x86.Build.0 = Debug|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x64.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x64.Build.0 = Release|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x86.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
