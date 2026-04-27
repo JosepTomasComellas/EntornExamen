@@ -1,0 +1,251 @@
+@page "/admin/diagnostic"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject UserStateService UserState
+@inject NavigationManager Nav
+@inject IStringLocalizer<SharedResources> Loc
+
+<PageTitle>Diagnòstic DHCP / DNS — EntornExamen</PageTitle>
+
+@if (!UserState.IsAdmin) { Nav.NavigateTo("/"); return; }
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4">
+    <MudButton StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/admin/estadistiques"
+               Variant="Variant.Text" Color="Color.Default">
+        @Loc["Nav_Dashboard"]
+    </MudButton>
+    <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+    <MudIcon Icon="@Icons.Material.Filled.Biotech" Color="Color.Primary" Class="mr-1" />
+    <MudText Typo="Typo.h5"><strong>Diagnòstic d'integració</strong></MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" Size="Size.Small"
+               StartIcon="@Icons.Material.Filled.Refresh"
+               OnClick="Recarregar" Disabled="_carregant">
+        Actualitzar
+    </MudButton>
+</MudStack>
+
+@if (_carregant)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+
+@if (_diagnostic is not null)
+{
+    <MudGrid Spacing="3">
+
+        <!-- DHCP -->
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudIcon Icon="@Icons.Material.Filled.Router"
+                                 Color="@(_diagnostic.Dhcp.Exists && _diagnostic.Dhcp.Error is null ? Color.Success : Color.Error)" />
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">DHCP Leases</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">isc-dhcp-server</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudList T="string" Dense="true">
+                        <MudListItem>
+                            <MudText Typo="Typo.caption"><strong>Fitxer:</strong> @_diagnostic.Dhcp.Path</MudText>
+                        </MudListItem>
+                        <MudListItem>
+                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@(_diagnostic.Dhcp.Exists ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Error)"
+                                         Color="@(_diagnostic.Dhcp.Exists ? Color.Success : Color.Error)"
+                                         Size="Size.Small" />
+                                <MudText Typo="Typo.caption">
+                                    @(_diagnostic.Dhcp.Exists
+                                        ? $"Accessible ({_diagnostic.Dhcp.Bytes:N0} bytes)"
+                                        : "No accessible")
+                                </MudText>
+                            </MudStack>
+                        </MudListItem>
+                        @if (_diagnostic.Dhcp.Modified.HasValue)
+                        {
+                            <MudListItem>
+                                <MudText Typo="Typo.caption">
+                                    <strong>Modificat:</strong>
+                                    @_diagnostic.Dhcp.Modified.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")
+                                </MudText>
+                            </MudListItem>
+                        }
+                        @if (_diagnostic.Dhcp.LastLine is not null)
+                        {
+                            <MudListItem>
+                                <MudText Typo="Typo.caption"><strong>Última línia:</strong></MudText>
+                                <MudText Typo="Typo.caption" Style="font-family:monospace;word-break:break-all;color:var(--mud-palette-text-secondary)">
+                                    @_diagnostic.Dhcp.LastLine
+                                </MudText>
+                            </MudListItem>
+                        }
+                        @if (_diagnostic.Dhcp.Error is not null)
+                        {
+                            <MudListItem>
+                                <MudAlert Severity="Severity.Error" Dense="true">@_diagnostic.Dhcp.Error</MudAlert>
+                            </MudListItem>
+                        }
+                    </MudList>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- DNS -->
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudIcon Icon="@Icons.Material.Filled.Dns"
+                                 Color="@(_diagnostic.Dns.Exists && _diagnostic.Dns.Error is null ? Color.Success : Color.Error)" />
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">DNS Queries Log</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">BIND9</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudList T="string" Dense="true">
+                        <MudListItem>
+                            <MudText Typo="Typo.caption"><strong>Fitxer:</strong> @_diagnostic.Dns.Path</MudText>
+                        </MudListItem>
+                        <MudListItem>
+                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@(_diagnostic.Dns.Exists ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Error)"
+                                         Color="@(_diagnostic.Dns.Exists ? Color.Success : Color.Error)"
+                                         Size="Size.Small" />
+                                <MudText Typo="Typo.caption">
+                                    @(_diagnostic.Dns.Exists
+                                        ? $"Accessible ({_diagnostic.Dns.Bytes:N0} bytes)"
+                                        : "No accessible")
+                                </MudText>
+                            </MudStack>
+                        </MudListItem>
+                        @if (_diagnostic.Dns.Modified.HasValue)
+                        {
+                            <MudListItem>
+                                <MudText Typo="Typo.caption">
+                                    <strong>Modificat:</strong>
+                                    @_diagnostic.Dns.Modified.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")
+                                </MudText>
+                            </MudListItem>
+                        }
+                        @if (_diagnostic.Dns.LastLine is not null)
+                        {
+                            <MudListItem>
+                                <MudText Typo="Typo.caption"><strong>Última entrada:</strong></MudText>
+                                <MudText Typo="Typo.caption" Style="font-family:monospace;word-break:break-all;color:var(--mud-palette-text-secondary)">
+                                    @_diagnostic.Dns.LastLine
+                                </MudText>
+                            </MudListItem>
+                        }
+                        @if (_diagnostic.Dns.Error is not null)
+                        {
+                            <MudListItem>
+                                <MudAlert Severity="Severity.Error" Dense="true">@_diagnostic.Dns.Error</MudAlert>
+                            </MudListItem>
+                        }
+                    </MudList>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Base de dades -->
+        <MudItem xs="12">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudIcon Icon="@Icons.Material.Filled.Storage" Color="Color.Info" />
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Base de dades</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">SQL Server</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudStack Row="true" Spacing="4" Wrap="Wrap.Wrap">
+                        <MudPaper Elevation="0" Class="pa-3" Style="min-width:140px;border:1px solid var(--mud-palette-divider)">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Sessions actives</MudText>
+                            <MudText Typo="Typo.h5">@_diagnostic.Bd.SessionsActives</MudText>
+                        </MudPaper>
+                        <MudPaper Elevation="0" Class="pa-3" Style="min-width:140px;border:1px solid var(--mud-palette-divider)">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Connexions actives</MudText>
+                            <MudText Typo="Typo.h5">@_diagnostic.Bd.RegistresActius</MudText>
+                        </MudPaper>
+                        @if (_diagnostic.Bd.UltimCheckin.HasValue)
+                        {
+                            <MudPaper Elevation="0" Class="pa-3" Style="min-width:200px;border:1px solid var(--mud-palette-divider)">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Últim check-in</MudText>
+                                <MudText Typo="Typo.body1">
+                                    @_diagnostic.Bd.UltimCheckin.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")
+                                </MudText>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Guia de validació -->
+        <MudItem xs="12">
+            <MudExpansionPanels Elevation="2">
+                <MudExpansionPanel Text="Com validar la integració DHCP i DNS">
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        <strong>DHCP:</strong> Connecta un dispositiu a la WiFi "Entorn_Examen" i comprova que:
+                    </MudText>
+                    <MudList T="string" Dense="true">
+                        <MudListItem Icon="@Icons.Material.Filled.ChevronRight">
+                            El fitxer <code>/var/lib/dhcp/dhcpd.leases</code> té una nova entrada amb la IP assignada.
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.ChevronRight">
+                            Al plafó del professor, apareix una nova estació (MAC desconeguda o identificada).
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.ChevronRight">
+                            La IP del dispositiu és del rang <code>192.168.100.x</code>.
+                        </MudListItem>
+                    </MudList>
+                    <MudText Typo="Typo.body2" Class="mt-3 mb-2">
+                        <strong>DNS:</strong> Des del dispositiu connectat a la WiFi, fes una petició DNS i comprova:
+                    </MudText>
+                    <MudList T="string" Dense="true">
+                        <MudListItem Icon="@Icons.Material.Filled.ChevronRight">
+                            L'últim registre del log DNS apareix aquí actualitzat.
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.ChevronRight">
+                            Si es consulta un domini extern (p.ex. <code>google.com</code>), al plafó del professor apareix una alerta "DNS externes".
+                        </MudListItem>
+                    </MudList>
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                        Si els fitxers no són accessibles, verifica que el contenidor API té els volums muntats:
+                        <code>/var/lib/dhcp/dhcpd.leases:/data/dhcpd.leases:ro</code> i
+                        <code>/var/log/named/queries.log:/data/dns-queries.log:ro</code>.
+                    </MudAlert>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudItem>
+
+    </MudGrid>
+}
+
+@code {
+    private DiagnosticDto? _diagnostic;
+    private bool _carregant;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserState.IsAdmin) return;
+        Api.SetToken(UserState.Token!);
+        await Recarregar();
+    }
+
+    private async Task Recarregar()
+    {
+        _carregant  = true;
+        StateHasChanged();
+        _diagnostic = await Api.GetDiagnosticAsync();
+        _carregant  = false;
+    }
+}

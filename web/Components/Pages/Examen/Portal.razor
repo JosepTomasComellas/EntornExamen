@@ -333,25 +333,31 @@
         _carregant = true;
         StateHasChanged();
         await Api.SortirExamenAsync();
-        _carregant   = false;
-        _checkinResp = null;
-        _fase        = Fase.Email;
-        _errorEmail  = null;
+        _carregant = false;
+        var studentId = _checkinResp?.Alumne.StudentId;
+        _checkinResp  = null;
+        _fase         = Fase.Email;
+        _errorEmail   = null;
         _timer?.Dispose();
         _timer = null;
-        if (_alumneHandler is not null && _checkinResp is not null)
-            ExamenNotif.DesubscriuAlumne(_checkinResp.Alumne.StudentId, _alumneHandler);
+        if (_alumneHandler is not null && studentId.HasValue)
+            ExamenNotif.DesubscriuAlumne(studentId.Value, _alumneHandler);
+        _alumneHandler = null;
         StateHasChanged();
     }
 
     private void TancarExpulsat()
     {
         _mostrarExpulsat = false;
+        var studentId    = _checkinResp?.Alumne.StudentId;
         _checkinResp     = null;
         _fase            = Fase.Email;
         _errorEmail      = Loc["ExamenPortal_ExpulsatMsg"].Value;
         _timer?.Dispose();
         _timer = null;
+        if (_alumneHandler is not null && studentId.HasValue)
+            ExamenNotif.DesubscriuAlumne(studentId.Value, _alumneHandler);
+        _alumneHandler = null;
         StateHasChanged();
     }
 
@@ -379,7 +385,8 @@
     public void Dispose()
     {
         _timer?.Dispose();
-        if (_alumneHandler is not null && _checkinResp is not null)
-            ExamenNotif.DesubscriuAlumne(_checkinResp.Alumne.StudentId, _alumneHandler);
+        var studentId = _checkinResp?.Alumne.StudentId;
+        if (_alumneHandler is not null && studentId.HasValue)
+            ExamenNotif.DesubscriuAlumne(studentId.Value, _alumneHandler);
     }
 }

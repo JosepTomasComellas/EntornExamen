@@ -1,4 +1,4 @@
-# EntornExamen · v2.5.0
+# EntornExamen · v2.6.0
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 
@@ -295,6 +295,16 @@ dotnet test AutoCo.Tests/
 ---
 
 ## Changelog
+
+### v2.6.0 (2026-04-27)
+- Fix: desubscripció de notificacions Redis en sortida/expulsió de l'alumne
+- Fix: thread safety del timer d'auto-refresh (Blazor Server `InvokeAsync`)
+- Fix: comprovació d'una sola estació sempre activa (amb IP de l'altra estació al missatge)
+- Fix: error compilació `ForwardedHeadersOptions` — migrat a `Configure<ForwardedHeadersOptions>()` + `using`
+- Icona d'avís a la graella si la IP de l'alumne no pertany al rang DHCP (192.168.100.x)
+- Icona diferenciada a la graella per sortida voluntària vs desconnexió involuntària
+- Pàgina de diagnòstic `/admin/diagnostic`: estat dels fitxers DHCP i DNS, dades de BD, guia de validació
+- Neteja automàtica de sessions tancades fa més de 30 dies (servei en segon pla)
 
 ### v2.5.0 (2026-04-27)
 - Alumne: botó "Sortir de l'examen" amb diàleg de confirmació; el professor ho veu com a sortida voluntària

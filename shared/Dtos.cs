@@ -163,6 +163,19 @@ public record AlumneMacDto(
     string ClassName, string Mac, string? Dispositiu,
     DateTime PrimerCopVist, string? FotoUrl);
 
+// ─── Diagnòstic integració (admin) ───────────────────────────────────────────
+public record DiagnosticDto(
+    DiagnosticFitxer Dhcp,
+    DiagnosticFitxer Dns,
+    DiagnosticBd     Bd);
+
+public record DiagnosticFitxer(
+    string Path, bool Exists, long Bytes,
+    DateTime? Modified, string? LastLine, string? Error);
+
+public record DiagnosticBd(
+    int SessionsActives, int RegistresActius, DateTime? UltimCheckin);
+
 // ─── Events SignalR (publicats per Redis) ─────────────────────────────────────
 public record ExamenEventAlumne(
     int? StudentId, string? Nom, string? Cognoms,

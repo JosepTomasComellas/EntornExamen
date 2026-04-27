@@ -317,17 +317,14 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 (r.StudentId == student.Id ||
                  (!string.IsNullOrEmpty(clientIp) && r.IpAssignada == clientIp)));
 
-        // Comprovació d'una sola estació: si l'alumne ja té un registre actiu des d'una altra IP, rebutja
-        if (registre is null || (registre.IpAssignada != clientIp && registre.StudentId == student.Id))
-        {
-            var altreRegistre = await db.RegistresConnexio
-                .FirstOrDefaultAsync(r => r.SessioId == sessio.Id &&
-                    r.StudentId == student.Id &&
-                    r.IpAssignada != clientIp &&
-                    r.Estat != EstatConnexio.Desconnectat);
-            if (altreRegistre is not null)
-                return (null, "Ja estàs connectat des d'una altra estació.");
-        }
+        // Comprovació d'una sola estació: sempre comprova si l'alumne té un registre actiu des d'una altra IP
+        var altreRegistre = await db.RegistresConnexio
+            .FirstOrDefaultAsync(r => r.SessioId == sessio.Id &&
+                r.StudentId == student.Id &&
+                r.IpAssignada != clientIp &&
+                r.Estat != EstatConnexio.Desconnectat);
+        if (altreRegistre is not null)
+            return (null, $"Ja estàs connectat des d'una altra estació ({altreRegistre.IpAssignada}).");
 
         string mac = "";
         if (registre is not null)

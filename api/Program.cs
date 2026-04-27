@@ -5,6 +5,7 @@ using EntornExamen.Shared.DTOs;
 using EntornExamen.Api.Services;
 using EntornExamen.Api.Hubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
@@ -49,12 +50,21 @@ builder.Services.AddScoped<IEmailService,     EmailService>();
 builder.Services.AddScoped<IBackupService,    BackupService>();
 builder.Services.AddScoped<IExamenService,    ExamenService>();
 
+// Capçaleres de proxy nginx (Docker): accepta X-Forwarded-For de qualsevol proxy intern
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 // ── Entorn Examen: hub de notificació (publicador Redis) ──────────────────────
 builder.Services.AddSingleton<ExamenHub>();
 
 // ── Entorn Examen: serveis background ─────────────────────────────────────────
 builder.Services.AddHostedService<DhcpMonitorService>();
 builder.Services.AddHostedService<DnsMonitorService>();
+builder.Services.AddHostedService<SessioCleanupService>();
 
 // ── Redis (caché de resultats) ─────────────────────────────────────────────────
 var redisConn = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
@@ -218,14 +228,9 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi(); // disponible a /openapi/v1.json
 }
 
-// Llegeix X-Real-IP / X-Forwarded-For des del proxy nginx (Docker)
-app.UseForwardedHeaders(new Microsoft.AspNetCore.HttpOverrides.ForwardedHeadersOptions
-{
-    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
-                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto,
-    KnownNetworks    = { new Microsoft.AspNetCore.HttpOverrides.IPNetwork(
-                             System.Net.IPAddress.Parse("172.0.0.0"), 8) }
-});
+// Llegeix X-Real-IP / X-Forwarded-For des del proxy nginx (Docker).
+// KnownNetworks/KnownProxies buits → accepta de qualsevol proxy (xarxa Docker controlada).
+app.UseForwardedHeaders();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -556,6 +561,73 @@ app.MapDelete("/api/admin/stats/logins", async (AppDbContext db, ClaimsPrincipal
     if (!IsAdmin(user)) return Results.Forbid();
     await db.ProfessorLogins.ExecuteDeleteAsync();
     return Results.NoContent();
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/diagnostic", async (AppDbContext db, IConfiguration config, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+
+    var dhcpPath = config["Examen:DhcpLeasesPath"] ?? "/data/dhcpd.leases";
+    var dnsPath  = config["Examen:DnsLogPath"]     ?? "/data/dns-queries.log";
+
+    // DHCP
+    string? dhcpError = null;
+    string? dhcpLastLine = null;
+    long    dhcpBytes = 0;
+    DateTime? dhcpModified = null;
+    try
+    {
+        var fi = new FileInfo(dhcpPath);
+        dhcpBytes    = fi.Exists ? fi.Length : -1;
+        dhcpModified = fi.Exists ? fi.LastWriteTimeUtc : null;
+        if (fi.Exists && fi.Length > 0)
+        {
+            // Llegeix les últimes línies del fitxer de leases
+            using var fs = new FileStream(dhcpPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            fs.Seek(Math.Max(0, fs.Length - 2048), SeekOrigin.Begin);
+            using var sr = new StreamReader(fs);
+            var tail = await sr.ReadToEndAsync();
+            dhcpLastLine = tail.Split('\n', StringSplitOptions.RemoveEmptyEntries).LastOrDefault()?.Trim();
+        }
+    }
+    catch (Exception ex) { dhcpError = ex.Message; }
+
+    // DNS
+    string? dnsError = null;
+    string? dnsLastLine = null;
+    long    dnsBytes = 0;
+    DateTime? dnsModified = null;
+    try
+    {
+        var fi = new FileInfo(dnsPath);
+        dnsBytes    = fi.Exists ? fi.Length : -1;
+        dnsModified = fi.Exists ? fi.LastWriteTimeUtc : null;
+        if (fi.Exists && fi.Length > 0)
+        {
+            using var fs = new FileStream(dnsPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            fs.Seek(Math.Max(0, fs.Length - 1024), SeekOrigin.Begin);
+            using var sr = new StreamReader(fs);
+            var tail = await sr.ReadToEndAsync();
+            dnsLastLine = tail.Split('\n', StringSplitOptions.RemoveEmptyEntries).LastOrDefault()?.Trim();
+        }
+    }
+    catch (Exception ex) { dnsError = ex.Message; }
+
+    // BD
+    var sessionsActives = await db.SessionsExamen.CountAsync(s => s.Activa);
+    var registresActius = await db.RegistresConnexio
+        .CountAsync(r => r.Estat != EntornExamen.Api.Data.Models.EstatConnexio.Desconnectat);
+    var ultimCheckin    = await db.RegistresConnexio
+        .Where(r => r.UltimCheckinAt.HasValue)
+        .OrderByDescending(r => r.UltimCheckinAt)
+        .Select(r => r.UltimCheckinAt)
+        .FirstOrDefaultAsync();
+
+    return Results.Ok(new DiagnosticDto(
+        new DiagnosticFitxer(dhcpPath, dhcpBytes >= 0, dhcpBytes, dhcpModified, dhcpLastLine, dhcpError),
+        new DiagnosticFitxer(dnsPath,  dnsBytes  >= 0, dnsBytes,  dnsModified,  dnsLastLine,  dnsError),
+        new DiagnosticBd(sessionsActives, registresActius, ultimCheckin)
+    ));
 }).RequireAuthorization();
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -257,6 +257,11 @@ public class ApiClient
         catch { return (null, "Error desconegut."); }
     }
 
+    // ── Diagnòstic (admin) ────────────────────────────────────────────────────
+
+    public Task<DiagnosticDto?> GetDiagnosticAsync() =>
+        GetAsync<DiagnosticDto>("/api/admin/diagnostic");
+
     // ── Estadístiques (admin) ─────────────────────────────────────────────────
 
     public Task<AdminStatsDto?> GetAdminStatsAsync() =>

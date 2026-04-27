@@ -210,6 +210,13 @@
                                     <div style="@($"width:10px;height:10px;border-radius:50%;background:{color}")"></div>
                                     <MudText Typo="Typo.caption" Style="@($"{textColor};font-weight:600")">
                                         @EstatText(a.Estat)
+                                        @if (a.Estat == EstatConnexioDto.Desconnectat && _sortideVoluntaries.Contains(a.MacAddress))
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.ExitToApp"
+                                                     Size="Size.Small" Color="Color.Warning"
+                                                     title="Ha sortit voluntàriament"
+                                                     Style="vertical-align:middle;margin-left:2px" />
+                                        }
                                     </MudText>
                                     @if (a.IpAssignada is not null)
                                     {
@@ -217,13 +224,19 @@
                                             · @a.IpAssignada
                                         </MudText>
                                     }
-                                    @if (a.DnsRecents.Any(d => d.EsExterna))
+                                        @if (a.DnsRecents.Any(d => d.EsExterna))
                                     {
                                         <MudIcon Icon="@Icons.Material.Filled.Warning"
                                                  Color="Color.Warning" Size="Size.Small"
                                                  title="DNS externes detectades"
-                                                 Class="ml-auto"
                                                  Style="animation:pulse-warning 1s infinite" />
+                                    }
+                                    @if (!EsIpDhcp(a.IpAssignada))
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.WifiOff"
+                                                 Color="Color.Error" Size="Size.Small"
+                                                 title="IP fora del rang DHCP (192.168.100.x)"
+                                                 Class="ml-auto" />
                                     }
                                 </MudStack>
 
@@ -605,6 +618,7 @@
 
     private Func<string, object, Task>? _sessioHandler;
     private System.Threading.Timer?     _refreshTimer;
+    private HashSet<string>             _sortideVoluntaries = [];
 
     private int _connectats => _alumnes.Count(a =>
         a.Estat is EstatConnexioDto.Connectat or EstatConnexioDto.SenseCheckin);
@@ -654,12 +668,15 @@
         ExamenNotif.SubscriuSessio(_sessioId.Value, _sessioHandler);
 
         // Auto-refresh cada 30 s com a fallback si Redis no publica
+        // Tota la mutació de l'estat passa dins InvokeAsync per garantir thread-safety a Blazor Server
         _refreshTimer?.Dispose();
         _refreshTimer = new System.Threading.Timer(async _ =>
-        {
-            await CarregarDashboard();
-            await InvokeAsync(StateHasChanged);
-        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+            await InvokeAsync(async () =>
+            {
+                await CarregarDashboard();
+                StateHasChanged();
+            }),
+            null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
     private async Task CarregarDashboard()
@@ -669,6 +686,9 @@
         if (dashboard is null) return;
         _sessio  = dashboard.Sessio;
         _alumnes = dashboard.Alumnes;
+        // Elimina de _sortideVoluntaries els alumnes que ja no figuren al dashboard
+        var macs = _alumnes.Select(a => a.MacAddress).ToHashSet();
+        _sortideVoluntaries.IntersectWith(macs);
     }
 
     private async Task ProcessarEventAsync(string eventNom, object data)
@@ -693,6 +713,7 @@
                 await JS.InvokeVoidAsync("examenSoDesconnexio");
                 break;
             case "AlumneDesconnectatVoluntari" when data is ExamenEventAlumne evt:
+                _sortideVoluntaries.Add(evt.Mac);
                 ActualitzarAlumne(evt.Mac, a => a with
                 {
                     Estat = EstatConnexioDto.Desconnectat
@@ -849,6 +870,12 @@
     {
         _alumneSeleccionat = a;
         _mostraDetall      = true;
+    }
+
+    private static bool EsIpDhcp(string? ip)
+    {
+        if (string.IsNullOrEmpty(ip)) return true;
+        return ip.StartsWith("192.168.100.", StringComparison.Ordinal);
     }
 
     private static string EstatColor(EstatConnexioDto estat) => estat switch
