@@ -1,4 +1,4 @@
-# EntornExamen · v2.3.0
+# EntornExamen · v2.4.0
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 
@@ -295,6 +295,13 @@ dotnet test AutoCo.Tests/
 ---
 
 ## Changelog
+
+### v2.4.0 (2026-04-27)
+- Plafó professor: pannell de detall d'estació ara apareix **al costat** de la graella (layout 2 columnes) en lloc d'un drawer que la comprimia
+- L'estació seleccionada es ressalta amb un contorn de color
+- Detall complet: foto, estat, correu, classe, núm. llista, MAC, IP, hora d'entrada (nova), últim check-in, DNS recents (fins a 15)
+- `ExamenAlumneDto` ara inclou `ConnectatAt` (hora primera connexió a la sessió)
+- Estacions no identificades mostren MAC/IP en lloc de nom
 
 ### v2.3.0 (2026-04-27)
 - **Fix crític**: check-in crash per `IpAssignada` truncada — columna ampliada a `NVARCHAR(45)` + normalització IPv4-mapped IPv6 (`::ffff:x.x.x.x → x.x.x.x`)

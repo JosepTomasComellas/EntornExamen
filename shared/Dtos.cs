@@ -146,7 +146,7 @@ public record ExamenAlumneDto(
     int? StudentId, string? Nom, string? Cognoms, string? Email,
     int? NumLlista, string? FotoUrl,
     string MacAddress, string? IpAssignada,
-    DateTime? UltimCheckinAt, EstatConnexioDto Estat,
+    DateTime ConnectatAt, DateTime? UltimCheckinAt, EstatConnexioDto Estat,
     List<PeticioTdnsDto> DnsRecents);
 
 // ─── Importació alumnes ───────────────────────────────────────────────────────

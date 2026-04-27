@@ -152,204 +152,286 @@
     </MudGrid>
 }
 
-<!-- Graella d'alumnes -->
-@if (_alumnes.Count > 0)
-{
-    <MudGrid Spacing="2" id="graella-examen">
-        @foreach (var a in _alumnesFiltrats)
+<!-- Layout principal: graella + pannell detall al costat -->
+<MudGrid Spacing="3">
+
+    <!-- Columna graella -->
+    <MudItem xs="12" md="@(_mostraDetall ? 8 : 12)">
+
+        @if (_alumnes.Count > 0)
         {
-            var color     = EstatColor(a.Estat);
-            var textColor = a.Estat == EstatConnexioDto.Connectat    ? "color:#15803d" :
-                            a.Estat == EstatConnexioDto.SenseCheckin ? "color:#b45309" :
-                            a.Estat == EstatConnexioDto.Desconnectat ? "color:#dc2626" :
-                                                                       "color:#6b7280";
-
-            <MudItem xs="12" sm="6" md="4" lg="3">
-                <MudCard Elevation="2"
-                         Style="@($"border-left:4px solid {color};cursor:pointer")"
-                         @onclick="() => SeleccionarAlumne(a)">
-                    <MudCardContent Class="pa-3">
-                        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                            @if (a.FotoUrl is not null)
-                            {
-                                <MudAvatar Style="width:48px;height:48px">
-                                    <MudImage Src="@a.FotoUrl"
-                                              Style="width:48px;height:48px;object-fit:cover" />
-                                </MudAvatar>
-                            }
-                            else
-                            {
-                                <MudAvatar Style="@($"width:48px;height:48px;background:{color}20;color:{color}")">
-                                    @((a.Nom?[..1] ?? "?") + (a.Cognoms?[..1] ?? ""))
-                                </MudAvatar>
-                            }
-                            <MudStack Spacing="0" Style="min-width:0;flex:1">
-                                <MudText Typo="Typo.body2"
-                                         Style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                                    @a.Cognoms, @a.Nom
-                                </MudText>
-                                <MudText Typo="Typo.caption"
-                                         Style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                                    @a.Email
-                                </MudText>
-                            </MudStack>
-                        </MudStack>
-
-                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="mt-2">
-                            <div style="@($"width:10px;height:10px;border-radius:50%;background:{color}")"></div>
-                            <MudText Typo="Typo.caption" Style="@($"{textColor};font-weight:600")">
-                                @EstatText(a.Estat)
-                            </MudText>
-                            @if (a.IpAssignada is not null)
-                            {
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    · @a.IpAssignada
-                                </MudText>
-                            }
-                            @if (a.DnsRecents.Any(d => d.EsExterna))
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.Warning"
-                                         Color="Color.Warning" Size="Size.Small"
-                                         title="DNS externes detectades"
-                                         Class="ml-auto"
-                                         Style="animation:pulse-warning 1s infinite" />
-                            }
-                        </MudStack>
-
-                        @if (a.UltimCheckinAt.HasValue)
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                Check-in: @a.UltimCheckinAt.Value.ToLocalTime().ToString("HH:mm:ss")
-                            </MudText>
-                        }
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
-        }
-    </MudGrid>
-}
-
-<!-- Panell d'alertes -->
-@if (_alertes.Count > 0)
-{
-    <MudPaper Elevation="2" Class="pa-3 mt-4">
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
-            <MudText Typo="Typo.subtitle2"><strong>@Loc["Examen_Alerts"]</strong></MudText>
-            <MudSpacer />
-            <MudButton Variant="Variant.Text" Size="Size.Small"
-                       OnClick="() => _alertes.Clear()">
-                @Loc["Examen_ClearAlerts"]
-            </MudButton>
-        </MudStack>
-        <MudList T="string" Dense="true">
-            @foreach (var alerta in _alertes.TakeLast(20).Reverse())
-            {
-                <MudListItem Icon="@alerta.Icona" IconColor="alerta.Color">
-                    <MudText Typo="Typo.caption">
-                        <strong>@alerta.Hora.ToLocalTime().ToString("HH:mm:ss")</strong>
-                        — @alerta.Text
-                    </MudText>
-                </MudListItem>
-            }
-        </MudList>
-    </MudPaper>
-}
-
-<!-- Drawer detall alumne -->
-<MudDrawer @bind-Open="_mostraDetall" Anchor="Anchor.Right" Elevation="4" Width="380px">
-    @if (_alumneSeleccionat is not null)
-    {
-        <MudDrawerHeader>
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                <MudText Typo="Typo.h6">
-                    @_alumneSeleccionat.Nom @_alumneSeleccionat.Cognoms
-                </MudText>
-                <MudSpacer />
-                <MudIconButton Icon="@Icons.Material.Filled.Close"
-                               OnClick="() => _mostraDetall = false" />
-            </MudStack>
-        </MudDrawerHeader>
-        <MudStack Class="pa-4" Spacing="3">
-
-            <!-- Foto -->
-            @if (_alumneSeleccionat.FotoUrl is not null)
-            {
-                <MudStack AlignItems="AlignItems.Center">
-                    <MudAvatar Style="width:96px;height:96px">
-                        <MudImage Src="@_alumneSeleccionat.FotoUrl"
-                                  Style="width:96px;height:96px;object-fit:cover" />
-                    </MudAvatar>
-                </MudStack>
-            }
-            else
-            {
-                <MudStack AlignItems="AlignItems.Center">
-                    <MudAvatar Style="@($"width:96px;height:96px;background:{EstatColor(_alumneSeleccionat.Estat)}20;font-size:2.2rem;color:{EstatColor(_alumneSeleccionat.Estat)}")">
-                        @((_alumneSeleccionat.Nom?[..1] ?? "?") + (_alumneSeleccionat.Cognoms?[..1] ?? ""))
-                    </MudAvatar>
-                </MudStack>
-            }
-
-            <!-- Estat visual -->
-            <MudStack AlignItems="AlignItems.Center">
-                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                    <div style="@($"width:12px;height:12px;border-radius:50%;background:{EstatColor(_alumneSeleccionat.Estat)}")"></div>
-                    <MudText Typo="Typo.body2" Style="font-weight:600">
-                        @EstatText(_alumneSeleccionat.Estat)
-                    </MudText>
-                </MudStack>
-            </MudStack>
-
-            <MudDivider />
-
-            <MudText Typo="Typo.body2">
-                <strong>@Loc["Examen_Detail_Email"]:</strong> @_alumneSeleccionat.Email
-            </MudText>
-            <MudText Typo="Typo.body2">
-                <strong>@Loc["Examen_Detail_Mac"]:</strong>
-                <span style="font-family:monospace">@_alumneSeleccionat.MacAddress</span>
-            </MudText>
-            <MudText Typo="Typo.body2">
-                <strong>@Loc["Examen_Detail_Ip"]:</strong> @(_alumneSeleccionat.IpAssignada ?? "—")
-            </MudText>
-            @if (_alumneSeleccionat.UltimCheckinAt.HasValue)
-            {
-                <MudText Typo="Typo.body2">
-                    <strong>Check-in:</strong>
-                    @_alumneSeleccionat.UltimCheckinAt.Value.ToLocalTime().ToString("HH:mm:ss")
-                </MudText>
-            }
-
-            <MudDivider />
-            <MudText Typo="Typo.subtitle2">@Loc["Examen_DnsRequests"]</MudText>
-            @if (_alumneSeleccionat.DnsRecents.Count == 0)
-            {
-                <MudText Typo="Typo.body2" Color="Color.Secondary">@Loc["Examen_NoDns"]</MudText>
-            }
-            else
-            {
-                foreach (var dns in _alumneSeleccionat.DnsRecents.OrderByDescending(d => d.Timestamp))
+            <MudGrid Spacing="2" id="graella-examen">
+                @foreach (var a in _alumnesFiltrats)
                 {
+                    var color     = EstatColor(a.Estat);
+                    var seleccionat = _alumneSeleccionat?.MacAddress == a.MacAddress;
+                    var textColor = a.Estat == EstatConnexioDto.Connectat    ? "color:#15803d" :
+                                    a.Estat == EstatConnexioDto.SenseCheckin ? "color:#b45309" :
+                                    a.Estat == EstatConnexioDto.Desconnectat ? "color:#dc2626" :
+                                                                               "color:#6b7280";
+
+                    <MudItem xs="12" sm="6" md="@(_mostraDetall ? 6 : 4)" lg="@(_mostraDetall ? 6 : 3)">
+                        <MudCard Elevation="@(seleccionat ? 6 : 2)"
+                                 Style="@($"border-left:4px solid {color};cursor:pointer;{(seleccionat ? $"outline:2px solid {color};outline-offset:2px" : "")}")"
+                                 @onclick="() => SeleccionarAlumne(a)">
+                            <MudCardContent Class="pa-3">
+                                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                                    @if (a.FotoUrl is not null)
+                                    {
+                                        <MudAvatar Style="width:48px;height:48px">
+                                            <MudImage Src="@a.FotoUrl"
+                                                      Style="width:48px;height:48px;object-fit:cover" />
+                                        </MudAvatar>
+                                    }
+                                    else
+                                    {
+                                        <MudAvatar Style="@($"width:48px;height:48px;background:{color}20;color:{color}")">
+                                            @((a.Nom?[..1] ?? "?") + (a.Cognoms?[..1] ?? ""))
+                                        </MudAvatar>
+                                    }
+                                    <MudStack Spacing="0" Style="min-width:0;flex:1">
+                                        <MudText Typo="Typo.body2"
+                                                 Style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                                            @(a.Nom is not null ? $"{a.Cognoms}, {a.Nom}" : a.MacAddress)
+                                        </MudText>
+                                        <MudText Typo="Typo.caption"
+                                                 Style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                                            @(a.Email ?? a.IpAssignada ?? "—")
+                                        </MudText>
+                                    </MudStack>
+                                </MudStack>
+
+                                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="mt-2">
+                                    <div style="@($"width:10px;height:10px;border-radius:50%;background:{color}")"></div>
+                                    <MudText Typo="Typo.caption" Style="@($"{textColor};font-weight:600")">
+                                        @EstatText(a.Estat)
+                                    </MudText>
+                                    @if (a.IpAssignada is not null)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            · @a.IpAssignada
+                                        </MudText>
+                                    }
+                                    @if (a.DnsRecents.Any(d => d.EsExterna))
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Warning"
+                                                 Color="Color.Warning" Size="Size.Small"
+                                                 title="DNS externes detectades"
+                                                 Class="ml-auto"
+                                                 Style="animation:pulse-warning 1s infinite" />
+                                    }
+                                </MudStack>
+
+                                @if (a.UltimCheckinAt.HasValue)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        Check-in: @a.UltimCheckinAt.Value.ToLocalTime().ToString("HH:mm:ss")
+                                    </MudText>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+
+        <!-- Panell d'alertes -->
+        @if (_alertes.Count > 0)
+        {
+            <MudPaper Elevation="2" Class="pa-3 mt-4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                    <MudText Typo="Typo.subtitle2"><strong>@Loc["Examen_Alerts"]</strong></MudText>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Text" Size="Size.Small"
+                               OnClick="() => _alertes.Clear()">
+                        @Loc["Examen_ClearAlerts"]
+                    </MudButton>
+                </MudStack>
+                <MudList T="string" Dense="true">
+                    @foreach (var alerta in _alertes.TakeLast(20).Reverse())
+                    {
+                        <MudListItem Icon="@alerta.Icona" IconColor="alerta.Color">
+                            <MudText Typo="Typo.caption">
+                                <strong>@alerta.Hora.ToLocalTime().ToString("HH:mm:ss")</strong>
+                                — @alerta.Text
+                            </MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudPaper>
+        }
+
+    </MudItem>
+
+    <!-- Pannell de detall de l'estació (apareix al costat) -->
+    @if (_mostraDetall && _alumneSeleccionat is not null)
+    {
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="4" Style="position:sticky;top:16px;border-radius:12px;overflow:hidden">
+
+                <!-- Capçalera -->
+                <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:.875rem 1rem">
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                        @if (dns.EsExterna)
+                        <MudText Typo="Typo.subtitle1"
+                                 Style="color:white;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                            @(_alumneSeleccionat.Nom is not null
+                                ? $"{_alumneSeleccionat.Cognoms}, {_alumneSeleccionat.Nom}"
+                                : "Estació sense identificar")
+                        </MudText>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                       Style="color:rgba(255,255,255,.7);margin:-8px -8px -8px 0"
+                                       Size="Size.Small"
+                                       OnClick="() => { _mostraDetall = false; _alumneSeleccionat = null; }" />
+                    </MudStack>
+                </div>
+
+                <MudStack Class="pa-3" Spacing="3">
+
+                    <!-- Avatar + estat -->
+                    <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                        @if (_alumneSeleccionat.FotoUrl is not null)
                         {
-                            <MudIcon Icon="@Icons.Material.Filled.Warning"
-                                     Color="Color.Warning" Size="Size.Small" />
+                            <MudAvatar Style="width:88px;height:88px">
+                                <MudImage Src="@_alumneSeleccionat.FotoUrl"
+                                          Style="width:88px;height:88px;object-fit:cover" />
+                            </MudAvatar>
                         }
                         else
                         {
-                            <MudIcon Icon="@Icons.Material.Filled.Check"
-                                     Color="Color.Success" Size="Size.Small" />
+                            <MudAvatar Style="@($"width:88px;height:88px;background:{EstatColor(_alumneSeleccionat.Estat)}20;font-size:2rem;color:{EstatColor(_alumneSeleccionat.Estat)}")">
+                                @(_alumneSeleccionat.Nom is not null
+                                    ? (_alumneSeleccionat.Nom[..1] + (_alumneSeleccionat.Cognoms?[..1] ?? ""))
+                                    : "?")
+                            </MudAvatar>
                         }
-                        <MudText Typo="Typo.caption">
-                            @dns.Timestamp.ToLocalTime().ToString("HH:mm:ss") — @dns.Domini
-                        </MudText>
+                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                            <div style="@($"width:10px;height:10px;border-radius:50%;background:{EstatColor(_alumneSeleccionat.Estat)}")"></div>
+                            <MudText Typo="Typo.body2" Style="font-weight:600">
+                                @EstatText(_alumneSeleccionat.Estat)
+                            </MudText>
+                        </MudStack>
                     </MudStack>
-                }
-            }
-        </MudStack>
+
+                    <!-- Dades de l'alumne (si identificat) -->
+                    @if (_alumneSeleccionat.Nom is not null)
+                    {
+                        <MudDivider />
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary"
+                                     Style="font-weight:700;text-transform:uppercase;letter-spacing:.05em">
+                                Alumne
+                            </MudText>
+                            @if (_alumneSeleccionat.Email is not null)
+                            {
+                                <MudStack Row="true" Spacing="1">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width:72px">
+                                        Correu
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Style="word-break:break-all">
+                                        @_alumneSeleccionat.Email
+                                    </MudText>
+                                </MudStack>
+                            }
+                            @if (_alumneSeleccionat.NumLlista.HasValue)
+                            {
+                                <MudStack Row="true" Spacing="1">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width:72px">
+                                        Núm. llista
+                                    </MudText>
+                                    <MudText Typo="Typo.caption">@_alumneSeleccionat.NumLlista</MudText>
+                                </MudStack>
+                            }
+                            @if (_sessio is not null)
+                            {
+                                <MudStack Row="true" Spacing="1">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width:72px">
+                                        Classe
+                                    </MudText>
+                                    <MudText Typo="Typo.caption">@_sessio.ClassName</MudText>
+                                </MudStack>
+                            }
+                        </MudStack>
+                    }
+
+                    <!-- Dades de xarxa -->
+                    <MudDivider />
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary"
+                                 Style="font-weight:700;text-transform:uppercase;letter-spacing:.05em">
+                            Xarxa
+                        </MudText>
+                        <MudStack Row="true" Spacing="1">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width:72px">MAC</MudText>
+                            <MudText Typo="Typo.caption" Style="font-family:monospace">
+                                @_alumneSeleccionat.MacAddress
+                            </MudText>
+                        </MudStack>
+                        <MudStack Row="true" Spacing="1">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width:72px">IP</MudText>
+                            <MudText Typo="Typo.caption" Style="font-family:monospace">
+                                @(_alumneSeleccionat.IpAssignada ?? "—")
+                            </MudText>
+                        </MudStack>
+                        <MudStack Row="true" Spacing="1">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width:72px">
+                                Entrada
+                            </MudText>
+                            <MudText Typo="Typo.caption">
+                                @_alumneSeleccionat.ConnectatAt.ToLocalTime().ToString("HH:mm:ss")
+                            </MudText>
+                        </MudStack>
+                        @if (_alumneSeleccionat.UltimCheckinAt.HasValue)
+                        {
+                            <MudStack Row="true" Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width:72px">
+                                    Check-in
+                                </MudText>
+                                <MudText Typo="Typo.caption">
+                                    @_alumneSeleccionat.UltimCheckinAt.Value.ToLocalTime().ToString("HH:mm:ss")
+                                </MudText>
+                            </MudStack>
+                        }
+                    </MudStack>
+
+                    <!-- Peticions DNS -->
+                    <MudDivider />
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary"
+                                 Style="font-weight:700;text-transform:uppercase;letter-spacing:.05em">
+                            @Loc["Examen_DnsRequests"]
+                        </MudText>
+                        @if (_alumneSeleccionat.DnsRecents.Count == 0)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @Loc["Examen_NoDns"]
+                            </MudText>
+                        }
+                        else
+                        {
+                            @foreach (var dns in _alumneSeleccionat.DnsRecents
+                                .OrderByDescending(d => d.Timestamp).Take(15))
+                            {
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                    <MudIcon Icon="@(dns.EsExterna
+                                                     ? Icons.Material.Filled.Warning
+                                                     : Icons.Material.Filled.Check)"
+                                             Color="@(dns.EsExterna ? Color.Warning : Color.Success)"
+                                             Size="Size.Small" />
+                                    <MudText Typo="Typo.caption">
+                                        @dns.Timestamp.ToLocalTime().ToString("HH:mm:ss")
+                                        — @dns.Domini
+                                    </MudText>
+                                </MudStack>
+                            }
+                        }
+                    </MudStack>
+
+                </MudStack>
+            </MudPaper>
+        </MudItem>
     }
-</MudDrawer>
+
+</MudGrid>
 
 <!-- Diàleg nova sessió -->
 <MudDialog @bind-Visible="_mostrarDialegNovaSessio">

@@ -149,7 +149,7 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 r.Student?.NumLlista,
                 r.StudentId.HasValue ? TryFotoUrl(r.StudentId.Value) : null,
                 r.MacAddress, r.IpAssignada,
-                r.UltimCheckinAt, (EstatConnexioDto)(int)r.Estat,
+                r.ConnectatAt, r.UltimCheckinAt, (EstatConnexioDto)(int)r.Estat,
                 r.PeticiosDns.OrderByDescending(p => p.Timestamp).Take(10)
                     .Select(p => new PeticioTdnsDto(p.Id, p.Domini, p.Timestamp, p.EsExterna))
                     .ToList()))
