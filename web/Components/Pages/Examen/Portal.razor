@@ -7,57 +7,55 @@
 
 <PageTitle>@Loc["ExamenPortal_Title"] — Salesians de Sarrià</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+@if (_fase == Fase.Email)
+{
+    <div style="min-height:80vh;display:flex;align-items:center;justify-content:center">
+        <MudContainer MaxWidth="MaxWidth.ExtraSmall">
+            <MudPaper Elevation="4" Style="overflow:hidden;border-radius:12px">
 
-    @if (_fase == Fase.Email)
-    {
-        <MudCard Elevation="6" Class="pa-6">
-            <MudCardContent>
-                <MudStack Spacing="4" AlignItems="AlignItems.Center">
-                    <MudImage Src="/images/logo2.png" Height="60" />
-                    <MudText Typo="Typo.h5" Align="Align.Center">
-                        <strong>@Loc["ExamenPortal_Title"]</strong>
-                    </MudText>
-                    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
-                        @Loc["ExamenPortal_Subtitle"]
-                    </MudText>
+                <div style="background:#1e293b;padding:1.5rem 2rem;display:flex;align-items:center;gap:1rem">
+                    <MudIcon Icon="@Icons.Material.Filled.MenuBook"
+                             Style="color:rgba(255,255,255,.9);font-size:2rem;flex-shrink:0" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.h6" Style="color:white;font-weight:700;line-height:1.2">
+                            @Loc["Login_Student_Title"]
+                        </MudText>
+                        <MudText Typo="Typo.caption" Style="color:rgba(255,255,255,.55)">
+                            @Loc["Login_Subtitle"]
+                        </MudText>
+                    </MudStack>
+                </div>
 
-                    <MudDivider />
-
-                    <MudText Typo="Typo.body1" Align="Align.Center">
-                        @Loc["ExamenPortal_EmailPrompt"]
-                    </MudText>
+                <div style="padding:1.75rem 2rem">
+                    @if (_errorEmail is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true">@_errorEmail</MudAlert>
+                    }
+                    @if (_suggeriment is not null)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4"
+                                  OnClick="@(() => { _email = _suggeriment; _suggeriment = null; })"
+                                  Style="cursor:pointer">
+                            @Loc["ExamenPortal_SuggestEmail", _suggeriment]
+                        </MudAlert>
+                    }
 
                     <MudTextField @bind-Value="_email"
                                   Label="@Loc["ExamenPortal_EmailLabel"]"
                                   InputType="InputType.Email"
                                   FullWidth="true"
                                   Variant="Variant.Outlined"
+                                  Class="mb-5"
                                   Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.Email"
                                   OnKeyDown="OnEmailKeyDown" />
 
-                    @if (_suggeriment is not null)
-                    {
-                        <MudAlert Severity="Severity.Info" Dense="true"
-                                  OnClick="@(() => { _email = _suggeriment; _suggeriment = null; })"
-                                  Style="cursor:pointer;width:100%">
-                            @Loc["ExamenPortal_SuggestEmail", _suggeriment]
-                        </MudAlert>
-                    }
-
-                    @if (_errorEmail is not null)
-                    {
-                        <MudAlert Severity="Severity.Error" Dense="true">@_errorEmail</MudAlert>
-                    }
-
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                               Size="Size.Large" OnClick="ValidarEmail"
-                               Disabled="_carregant"
-                               StartIcon="@Icons.Material.Filled.Login">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               FullWidth="true" Size="Size.Large"
+                               OnClick="ValidarEmail" Disabled="_carregant">
                         @if (_carregant)
                         {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                         }
                         else
                         {
@@ -65,69 +63,70 @@
                         }
                     </MudButton>
 
-                    <MudButton Variant="Variant.Text" Color="Color.Default" FullWidth="true"
-                               Href="/" StartIcon="@Icons.Material.Filled.ArrowBack"
-                               Size="Size.Small">
+                    <MudLink Href="/" Class="d-block text-center mt-3" Color="Color.Secondary">
                         @Loc["Action_Back"]
-                    </MudButton>
-                </MudStack>
-            </MudCardContent>
-        </MudCard>
-    }
+                    </MudLink>
+                </div>
 
-    @if (_fase == Fase.Connectat && _checkinResp is not null)
-    {
-        <MudCard Elevation="6" Class="pa-4">
-            <MudCardContent>
-                <MudStack Spacing="3" AlignItems="AlignItems.Center">
+            </MudPaper>
+        </MudContainer>
+    </div>
+}
 
+@if (_fase == Fase.Connectat && _checkinResp is not null)
+{
+    <div style="min-height:80vh;display:flex;align-items:center;justify-content:center">
+        <MudContainer MaxWidth="MaxWidth.ExtraSmall">
+            <MudPaper Elevation="4" Style="overflow:hidden;border-radius:12px">
+
+                <!-- Capçalera amb foto/avatar i nom -->
+                <div style="background:#1e293b;padding:1.5rem 2rem;display:flex;align-items:center;gap:1rem">
                     @if (_checkinResp.Alumne.FotoUrl is not null)
                     {
-                        <MudAvatar Style="width:96px;height:96px">
+                        <MudAvatar Style="width:56px;height:56px;flex-shrink:0">
                             <MudImage Src="@_checkinResp.Alumne.FotoUrl"
-                                      Style="width:96px;height:96px;object-fit:cover" />
+                                      Style="width:56px;height:56px;object-fit:cover" />
                         </MudAvatar>
                     }
                     else
                     {
-                        <MudAvatar Color="Color.Primary" Style="width:96px;height:96px;font-size:2.5rem">
+                        <MudAvatar Style="width:56px;height:56px;background:#334155;font-size:1.5rem;color:rgba(255,255,255,.9);flex-shrink:0">
                             @((_checkinResp.Alumne.Nom?[..1] ?? "") + (_checkinResp.Alumne.Cognoms?[..1] ?? ""))
                         </MudAvatar>
                     }
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.h6" Style="color:white;font-weight:700;line-height:1.2">
+                            @_checkinResp.Alumne.Nom @_checkinResp.Alumne.Cognoms
+                        </MudText>
+                        <MudText Typo="Typo.caption" Style="color:rgba(255,255,255,.55)">
+                            @_checkinResp.Alumne.Classe
+                        </MudText>
+                    </MudStack>
+                </div>
 
-                    <MudText Typo="Typo.h5" Align="Align.Center">
-                        @_checkinResp.Alumne.Nom @_checkinResp.Alumne.Cognoms
-                    </MudText>
-                    <MudChip T="string" Color="Color.Secondary" Size="Size.Small">
-                        @_checkinResp.Alumne.Classe
-                    </MudChip>
-
-                    <MudDivider />
-
+                <div style="padding:1.5rem 2rem">
                     @if (!string.IsNullOrWhiteSpace(_checkinResp.Sessio.Titol))
                     {
-                        <MudText Typo="Typo.subtitle1" Align="Align.Center">
-                            <strong>@_checkinResp.Sessio.Titol</strong>
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600" Class="mb-1">
+                            @_checkinResp.Sessio.Titol
                         </MudText>
                     }
                     @if (!string.IsNullOrWhiteSpace(_checkinResp.Sessio.Descripcio))
                     {
-                        <MudText Typo="Typo.body2" Align="Align.Center">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
                             @_checkinResp.Sessio.Descripcio
                         </MudText>
                     }
 
-                    <MudDivider />
-
-                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                        <div style="width:14px;height:14px;border-radius:50%;background:#22c55e;
-                                    animation: pulse-green 1.5s infinite"></div>
-                        <MudText Typo="Typo.body1" Color="Color.Success">
-                            <strong>@Loc["ExamenPortal_Connected"]</strong>
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-2">
+                        <div style="width:12px;height:12px;border-radius:50%;background:#22c55e;
+                                    animation:pulse-green 1.5s infinite;flex-shrink:0"></div>
+                        <MudText Typo="Typo.body2" Color="Color.Success" Style="font-weight:600">
+                            @Loc["ExamenPortal_Connected"]
                         </MudText>
                     </MudStack>
 
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2 d-block">
                         @Loc["ExamenPortal_LastCheckin",
                              _ultimCheckin.ToLocalTime().ToString("HH:mm:ss"),
                              _segonsRestants]
@@ -136,9 +135,7 @@
                     <MudProgressLinear
                         Value="@(CheckinInterval > 0 ? (100 - _segonsRestants * 100 / CheckinInterval) : 0)"
                         Color="Color.Success" Rounded="true" Size="Size.Small"
-                        Style="width:100%" />
-
-                    <MudDivider />
+                        Class="mb-4" />
 
                     <MudButton Variant="Variant.Outlined" Color="Color.Error" FullWidth="true"
                                Size="Size.Small"
@@ -146,12 +143,12 @@
                                OnClick="() => _confirmarSortida = true">
                         @Loc["ExamenPortal_ExitExam"]
                     </MudButton>
-                </MudStack>
-            </MudCardContent>
-        </MudCard>
-    }
+                </div>
 
-</MudContainer>
+            </MudPaper>
+        </MudContainer>
+    </div>
+}
 
 <!-- Diàleg de confirmació de sortida voluntària -->
 <MudDialog @bind-Visible="_confirmarSortida">

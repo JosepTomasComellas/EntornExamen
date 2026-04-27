@@ -67,10 +67,13 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 .Select(p => new PeticioTdnsDto(p.Id, p.Domini, p.Timestamp, p.EsExterna))
                 .ToList());
 
-    private static SessioExamenDto ToSessioDto(SessioExamen s, int total = 0, int connectats = 0) =>
+    private int CheckinIntervalSegons =>
+        int.TryParse(config["Examen:CheckinIntervalSeconds"], out var iv) ? iv : 30;
+
+    private SessioExamenDto ToSessioDto(SessioExamen s, int total = 0, int connectats = 0) =>
         new(s.Id, s.ClassId, s.Class?.Name ?? "", s.ProfessorId, s.Professor?.NomComplet ?? "",
             s.Titol, s.Descripcio, s.MissatgeActiu,
-            s.IniciadaAt, s.TancadaAt, s.Activa, total, connectats);
+            s.IniciadaAt, s.TancadaAt, s.Activa, total, connectats, CheckinIntervalSegons);
 
     // ─── Sessions ─────────────────────────────────────────────────────────────
 

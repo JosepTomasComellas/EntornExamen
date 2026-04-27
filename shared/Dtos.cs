@@ -99,7 +99,8 @@ public record SessioExamenDto(
     int Id, int ClassId, string ClassName, int ProfessorId, string ProfessorNom,
     string? Titol, string? Descripcio, string? MissatgeActiu,
     DateTime IniciadaAt, DateTime? TancadaAt, bool Activa,
-    int TotalAlumnes, int AlumnesConnectats);
+    int TotalAlumnes, int AlumnesConnectats,
+    int IntervalSegons = 30);
 
 public record CreateSessioRequest(int ClassId, string? Titol, string? Descripcio);
 
