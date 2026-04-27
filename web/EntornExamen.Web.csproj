@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\shared\AutoCo.Shared.csproj" />
+    <ProjectReference Include="..\shared\EntornExamen.Shared.csproj" />
   </ItemGroup>
 
 </Project>
