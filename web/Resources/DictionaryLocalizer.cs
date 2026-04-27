@@ -15,7 +15,7 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
         // ── Autenticació ──────────────────────────────────────────────────────
         ["Login_Teacher_Title"]            = "Accés Professor",
         ["Login_Student_Title"]            = "Accés Alumne",
-        ["Login_Subtitle"]                 = "AutoCo · Avaluació entre iguals",
+        ["Login_Subtitle"]                 = "Salesians de Sarrià · Entorn d'Examens",
         ["Login_Email"]                    = "Correu electrònic",
         ["Login_Password"]                 = "Contrasenya",
         ["Login_Submit"]                   = "Entrar",
@@ -579,7 +579,7 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
         ["Informe_PeerDetail"]      = "Detall per avaluador",
         ["Informe_ColEvaluator"]    = "Avaluador/a",
         ["Informe_ColComment"]      = "Comentari",
-        ["Informe_Footer"]          = "Salesians de Sarrià · Dept. d'Informàtica · AutoCo v{0}",
+        ["Informe_Footer"]          = "Salesians de Sarrià · Dept. d'Informàtica · Entorn d'Examens v{0}",
 
         // ── Diàlegs compartits ────────────────────────────────────────────────
         ["Dlg_ActivityName"]     = "Nom de l'activitat",
@@ -758,7 +758,7 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
         // ── Autenticació ──────────────────────────────────────────────────────
         ["Login_Teacher_Title"]            = "Acceso Profesor",
         ["Login_Student_Title"]            = "Acceso Alumno",
-        ["Login_Subtitle"]                 = "AutoCo · Evaluación entre iguales",
+        ["Login_Subtitle"]                 = "Salesians de Sarrià · Entorn d'Examens",
         ["Login_Email"]                    = "Correo electrónico",
         ["Login_Password"]                 = "Contraseña",
         ["Login_Submit"]                   = "Entrar",
@@ -1322,7 +1322,7 @@ public sealed class DictionaryLocalizer : IStringLocalizer<SharedResources>
         ["Informe_PeerDetail"]      = "Detalle por evaluador",
         ["Informe_ColEvaluator"]    = "Evaluador/a",
         ["Informe_ColComment"]      = "Comentario",
-        ["Informe_Footer"]          = "Salesians de Sarrià · Dept. d'Informàtica · AutoCo v{0}",
+        ["Informe_Footer"]          = "Salesians de Sarrià · Dept. d'Informàtica · Entorn d'Examens v{0}",
 
         // ── Diàlegs compartits ────────────────────────────────────────────────
         ["Dlg_ActivityName"]     = "Nombre de la actividad",

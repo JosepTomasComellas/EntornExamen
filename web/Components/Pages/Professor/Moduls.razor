@@ -6,7 +6,7 @@
 @inject ISnackbar Snackbar
 @inject IStringLocalizer<SharedResources> Loc
 
-<PageTitle>Mòduls – AutoCo</PageTitle>
+<PageTitle>Mòduls – Entorn d'Examens</PageTitle>
 @if (!UserState.IsProfessor) { Nav.NavigateTo("/"); return; }
 
 @if (_classe is null && !_loading)

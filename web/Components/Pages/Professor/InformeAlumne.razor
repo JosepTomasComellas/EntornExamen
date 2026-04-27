@@ -5,7 +5,7 @@
 @inject IJSRuntime JS
 @inject IStringLocalizer<SharedResources> Loc
 
-<PageTitle>Informe alumne – AutoCo</PageTitle>
+<PageTitle>Informe alumne – Entorn d'Examens</PageTitle>
 @if (!UserState.IsProfessor) { Nav.NavigateTo("/"); return; }
 
 <!-- Barra d'acció (s'oculta en imprimir) -->
@@ -40,7 +40,7 @@ else
         <!-- Capçalera -->
         <div class="informe-header">
             <div class="informe-logo-area">
-                <img src="/images/logo2.png" height="40" alt="AutoCo" />
+                <img src="/images/logo2.png" height="40" alt="Entorn d'Examens" />
             </div>
             <div class="informe-titol-area">
                 <div class="informe-titol">@Loc["Informe_Title"]</div>
@@ -48,7 +48,7 @@ else
             </div>
             <div class="informe-data-area">
                 <div>@DateTime.Now.ToString("dd/MM/yyyy")</div>
-                <div style="font-size:.75rem;opacity:.6">AutoCo v@(AppVersion.Current)</div>
+                <div style="font-size:.75rem;opacity:.6">Entorn d'Examens v@(AppVersion.Current)</div>
             </div>
         </div>
 

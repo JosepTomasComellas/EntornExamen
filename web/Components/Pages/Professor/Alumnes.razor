@@ -7,7 +7,7 @@
 @inject IJSRuntime JS
 @inject IStringLocalizer<SharedResources> Loc
 
-<PageTitle>Alumnes – AutoCo</PageTitle>
+<PageTitle>Alumnes – Entorn d'Examens</PageTitle>
 @if (!UserState.IsProfessor) { Nav.NavigateTo("/"); return; }
 
 @if (_classe is null && !_loading)
