@@ -624,21 +624,45 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         if (!isAdmin) return (new ImportacioAlumnesResult(0, 0, 0, []), "Sense permisos.");
 
         System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
-        ExcelReaderFactory.CreateReader(xlsStream, new ExcelReaderConfiguration
-            { FallbackEncoding = System.Text.Encoding.GetEncoding(1252) });
 
-        xlsStream.Position = 0;
-        using var reader = ExcelReaderFactory.CreateReader(xlsStream, new ExcelReaderConfiguration
-            { FallbackEncoding = System.Text.Encoding.GetEncoding(1252) });
-        var ds = reader.AsDataSet(new ExcelDataSetConfiguration
-            { ConfigureDataTable = _ => new ExcelDataTableConfiguration { UseHeaderRow = false } });
+        // Copia a memòria per poder rellegir si cal
+        using var ms = new MemoryStream();
+        await xlsStream.CopyToAsync(ms);
+        ms.Position = 0;
 
-        if (ds.Tables.Count == 0) return (new ImportacioAlumnesResult(0, 0, 0, ["Fitxer buit."]), null);
-        var sheet = ds.Tables[0];
-        if (sheet.Rows.Count < 4) return (new ImportacioAlumnesResult(0, 0, 0, ["Format incorrecte: menys de 4 files."]), null);
+        List<List<string>> files;
+        try
+        {
+            using var reader = ExcelReaderFactory.CreateReader(ms, new ExcelReaderConfiguration
+                { FallbackEncoding = System.Text.Encoding.GetEncoding(1252) });
+            var ds = reader.AsDataSet(new ExcelDataSetConfiguration
+                { ConfigureDataTable = _ => new ExcelDataTableConfiguration { UseHeaderRow = false } });
+            if (ds.Tables.Count == 0) return (new ImportacioAlumnesResult(0, 0, 0, ["Fitxer buit."]), null);
+            var sheet = ds.Tables[0];
+            files = [];
+            for (int r = 0; r < sheet.Rows.Count; r++)
+            {
+                var cols = new List<string>();
+                for (int c = 0; c < sheet.Columns.Count; c++)
+                    cols.Add(sheet.Rows[r][c]?.ToString()?.Trim() ?? "");
+                files.Add(cols);
+            }
+        }
+        catch (ExcelDataReader.Exceptions.HeaderException)
+        {
+            // Fallback: EPSS exporta HTML amb extensió .xls
+            ms.Position = 0;
+            var html = await new StreamReader(ms, System.Text.Encoding.GetEncoding(1252)).ReadToEndAsync();
+            files = ParseHtmlTable(html);
+            if (files.Count == 0)
+                return (new ImportacioAlumnesResult(0, 0, 0,
+                    ["Format no reconegut. Cal XLS/XLSX o HTML exportat d'EPSS."]), null);
+        }
 
-        // Fila 0: "S1SX (2025)" → nom de classe
-        var nomClasse = sheet.Rows[0][0]?.ToString()?.Trim() ?? "";
+        if (files.Count < 4) return (new ImportacioAlumnesResult(0, 0, 0, ["Format incorrecte: menys de 4 files."]), null);
+
+        // Fila 0: nom de classe, Fila 1: buida, Fila 2: capçaleres, Fila 3+: dades
+        var nomClasse = files[0].Count > 0 ? files[0][0] : "";
         if (string.IsNullOrWhiteSpace(nomClasse))
             return (new ImportacioAlumnesResult(0, 0, 0, ["No s'ha pogut detectar el nom de la classe."]), null);
 
@@ -653,18 +677,19 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         var importats = 0; var actualitzats = 0; var saltats = 0;
         var errors = new List<string>();
 
-        // Fila 0: nom, Fila 1: buida, Fila 2: capçaleres, Fila 3+: dades
-        for (int r = 3; r < sheet.Rows.Count; r++)
+        for (int r = 3; r < files.Count; r++)
         {
-            var row = sheet.Rows[r];
-            var numStr = row[0]?.ToString()?.Trim() ?? "";
+            var row = files[r];
+            if (row.Count < 6) { saltats++; continue; }
+
+            var numStr = row[0];
             if (!int.TryParse(numStr, out var num)) { saltats++; continue; }
 
-            var cognoms = row[1]?.ToString()?.Trim() ?? "";
-            var nom     = row[2]?.ToString()?.Trim() ?? "";
-            var dni     = row[3]?.ToString()?.Trim();
-            var baixa   = row[5]?.ToString()?.Trim(); // col 5: Baixa
-            var email   = row[9]?.ToString()?.Trim()?.ToLower(); // col 9: Email
+            var cognoms = row[1];
+            var nom     = row[2];
+            var dni     = row.Count > 3 ? row[3] : "";
+            var baixa   = row[5]; // col 5: Baixa
+            var email   = row.Count > 9 ? row[9].ToLower() : "";
 
             if (!string.IsNullOrWhiteSpace(baixa)) { saltats++; continue; }
             if (string.IsNullOrWhiteSpace(nom) && string.IsNullOrWhiteSpace(cognoms)) { saltats++; continue; }
@@ -684,15 +709,15 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                         Cognoms      = cognoms,
                         Email        = email,
                         NumLlista    = num,
-                        Dni          = dni,
+                        Dni          = string.IsNullOrWhiteSpace(dni) ? null : dni,
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword(PasswordHelper.Generate())
                     });
                     importats++;
                 }
                 else
                 {
-                    student.Nom      = nom;
-                    student.Cognoms  = cognoms;
+                    student.Nom       = nom;
+                    student.Cognoms   = cognoms;
                     student.NumLlista = num;
                     if (!string.IsNullOrWhiteSpace(dni)) student.Dni = dni;
                     actualitzats++;
@@ -703,6 +728,27 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
 
         await db.SaveChangesAsync();
         return (new ImportacioAlumnesResult(importats, actualitzats, saltats, errors), null);
+    }
+
+    private static List<List<string>> ParseHtmlTable(string html)
+    {
+        var rows = new List<List<string>>();
+        var rowMatches = Regex.Matches(html, @"<tr\b[^>]*>(.*?)</tr>",
+            RegexOptions.Singleline | RegexOptions.IgnoreCase);
+        foreach (Match rowMatch in rowMatches)
+        {
+            var cols = new List<string>();
+            var cellMatches = Regex.Matches(rowMatch.Groups[1].Value,
+                @"<t[dh]\b[^>]*>(.*?)</t[dh]>",
+                RegexOptions.Singleline | RegexOptions.IgnoreCase);
+            foreach (Match cellMatch in cellMatches)
+            {
+                var text = Regex.Replace(cellMatch.Groups[1].Value, @"<[^>]+>", "").Trim();
+                cols.Add(System.Net.WebUtility.HtmlDecode(text));
+            }
+            if (cols.Count > 0) rows.Add(cols);
+        }
+        return rows;
     }
 
     // ─── Importació fotos ─────────────────────────────────────────────────────
@@ -717,6 +763,12 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         var noTrobades = new List<string>();
         var errors = new List<string>();
 
+        // Carrega tots els DNIs a memòria per evitar Regex en LINQ (no traduïble a SQL)
+        var studentsWithDni = await db.Students
+            .Where(s => s.Dni != null)
+            .Select(s => new { s.Id, Dni = s.Dni! })
+            .ToListAsync();
+
         try
         {
             using var zip = new ZipArchive(zipStream, ZipArchiveMode.Read);
@@ -725,14 +777,13 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 e.Name.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase)))
             {
                 // Nom del fitxer = DNI sencer o part numèrica (format EPSS: sense lletra)
-                var dni     = Path.GetFileNameWithoutExtension(entry.Name).Trim().ToUpper();
-                var dniNum  = Regex.Replace(dni, @"[^0-9]", "");
-                var student = await db.Students
-                    .FirstOrDefaultAsync(s => s.Dni != null && (
-                        s.Dni.ToUpper() == dni ||
-                        Regex.Replace(s.Dni, @"[^0-9]", "") == dniNum));
+                var dni    = Path.GetFileNameWithoutExtension(entry.Name).Trim().ToUpper();
+                var dniNum = Regex.Replace(dni, @"[^0-9]", "");
+                var match  = studentsWithDni.FirstOrDefault(s =>
+                    s.Dni.ToUpper() == dni ||
+                    Regex.Replace(s.Dni, @"[^0-9]", "") == dniNum);
 
-                if (student is null)
+                if (match is null)
                 {
                     noTrobades.Add(entry.Name);
                     continue;
@@ -740,7 +791,7 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
 
                 try
                 {
-                    var dest = Path.Combine(destDir, $"{student.Id}.jpg");
+                    var dest = Path.Combine(destDir, $"{match.Id}.jpg");
                     using var entryStream = entry.Open();
                     using var fs = File.Create(dest);
                     await entryStream.CopyToAsync(fs);

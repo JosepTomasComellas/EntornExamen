@@ -27,6 +27,14 @@
                Href="/professor/export-students">
         @Loc["Classes_ExportStudents"]
     </MudButton>
+    @if (UserState.IsAdmin)
+    {
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                   StartIcon="@Icons.Material.Filled.Upload"
+                   Href="/admin/importar-epss">
+            @Loc["Dash_ImportarEpss"]
+        </MudButton>
+    }
 </MudStack>
 
 <MudGrid>

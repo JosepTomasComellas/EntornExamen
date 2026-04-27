@@ -116,8 +116,12 @@
             </MudCardHeader>
             <MudCardContent>
                 <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                    <strong>@Loc["Epss_Important"]</strong>
-                    @Loc["Epss_AlumnesDesc"]
+                    <strong>@Loc["Epss_ComObtenir"]</strong>
+                    <ol style="margin:4px 0 0 16px;padding:0">
+                        <li><MudText Typo="Typo.caption">@Loc["Epss_Pas1"]</MudText></li>
+                        <li><MudText Typo="Typo.caption">@Loc["Epss_Pas2"]</MudText></li>
+                        <li><MudText Typo="Typo.caption">@Loc["Epss_Pas3"]</MudText></li>
+                    </ol>
                 </MudAlert>
 
                 <MudFileUpload T="IBrowserFile" FilesChanged="OnZipSeleccionat"
