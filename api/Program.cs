@@ -65,6 +65,7 @@ builder.Services.AddSingleton<ExamenHub>();
 builder.Services.AddHostedService<DhcpMonitorService>();
 builder.Services.AddHostedService<DnsMonitorService>();
 builder.Services.AddHostedService<SessioCleanupService>();
+builder.Services.AddHostedService<CheckinTimeoutService>();
 
 // ── Redis (caché de resultats) ─────────────────────────────────────────────────
 var redisConn = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
@@ -582,12 +583,32 @@ app.MapGet("/api/admin/diagnostic", async (AppDbContext db, IConfiguration confi
         dhcpModified = fi.Exists ? fi.LastWriteTimeUtc : null;
         if (fi.Exists && fi.Length > 0)
         {
-            // Llegeix les últimes línies del fitxer de leases
             using var fs = new FileStream(dhcpPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            fs.Seek(Math.Max(0, fs.Length - 2048), SeekOrigin.Begin);
+            fs.Seek(Math.Max(0, fs.Length - 8192), SeekOrigin.Begin);
             using var sr = new StreamReader(fs);
             var tail = await sr.ReadToEndAsync();
-            dhcpLastLine = tail.Split('\n', StringSplitOptions.RemoveEmptyEntries).LastOrDefault()?.Trim();
+            var blocs = System.Text.RegularExpressions.Regex.Matches(tail,
+                @"lease\s+([\d\.]+)\s*\{([^}]*)\}",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+            var actives = blocs.Cast<System.Text.RegularExpressions.Match>()
+                .Where(b => System.Text.RegularExpressions.Regex.IsMatch(
+                    b.Groups[2].Value, @"binding state\s+active;",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                .ToList();
+            if (actives.Count > 0)
+            {
+                var ult = actives[^1];
+                var macM = System.Text.RegularExpressions.Regex.Match(
+                    ult.Groups[2].Value, @"hardware ethernet\s+([\da-fA-F:]{17});");
+                dhcpLastLine = $"{actives.Count} concessions actives; última: {ult.Groups[1].Value}" +
+                    (macM.Success ? $" ({macM.Groups[1].Value})" : "");
+            }
+            else
+            {
+                dhcpLastLine = blocs.Count > 0
+                    ? $"{blocs.Count} concessions trobades al fitxer, cap activa"
+                    : "Cap concessió trobada al fitxer";
+            }
         }
     }
     catch (Exception ex) { dhcpError = ex.Message; }

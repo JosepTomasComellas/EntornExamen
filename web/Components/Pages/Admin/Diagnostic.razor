@@ -4,6 +4,7 @@
 @inject UserStateService UserState
 @inject NavigationManager Nav
 @inject IStringLocalizer<SharedResources> Loc
+@inject IConfiguration Config
 
 <PageTitle>Diagnòstic DHCP / DNS — EntornExamen</PageTitle>
 
@@ -11,7 +12,7 @@
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4">
     <MudButton StartIcon="@Icons.Material.Filled.ArrowBack"
-               Href="/admin/estadistiques"
+               Href="/professor/dashboard"
                Variant="Variant.Text" Color="Color.Default">
         @Loc["Nav_Dashboard"]
     </MudButton>
@@ -204,7 +205,7 @@
                             Al plafó del professor, apareix una nova estació (MAC desconeguda o identificada).
                         </MudListItem>
                         <MudListItem Icon="@Icons.Material.Filled.ChevronRight">
-                            La IP del dispositiu és del rang <code>192.168.100.x</code>.
+                            La IP del dispositiu és del rang <code>@(Config["Examen:DhcpNetworkPrefix"] ?? "192.168.100.")x</code>.
                         </MudListItem>
                     </MudList>
                     <MudText Typo="Typo.body2" Class="mt-3 mb-2">

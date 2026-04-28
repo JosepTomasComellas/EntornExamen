@@ -6,6 +6,7 @@
 @inject ExamenNotificationService ExamenNotif
 @inject IJSRuntime JS
 @inject IStringLocalizer<SharedResources> Loc
+@inject IConfiguration Config
 @implements IDisposable
 
 <PageTitle>@Loc["Examen_Title"] – Entorn d'Examens</PageTitle>
@@ -208,7 +209,7 @@
 <MudGrid Spacing="3">
 
     <!-- Columna graella -->
-    <MudItem xs="12" md="@(_mostraDetall ? 8 : 12)">
+    <MudItem xs="12" md="@(_mostraDetall ? 9 : 12)">
 
         @if (_alumnes.Count > 0)
         {
@@ -291,14 +292,11 @@
                                 {
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">
                                         Check-in: @a.UltimCheckinAt.Value.ToLocalTime().ToString("HH:mm:ss")
+                                        @if (a.Estat is EstatConnexioDto.Connectat or EstatConnexioDto.SenseCheckin)
+                                        {
+                                            <text> — <span style="@ElapsedStyle(a.UltimCheckinAt.Value)">@FormatElapsed((int)(_ara - a.UltimCheckinAt.Value).TotalSeconds)</span></text>
+                                        }
                                     </MudText>
-                                    @if (a.Estat is EstatConnexioDto.Connectat or EstatConnexioDto.SenseCheckin)
-                                    {
-                                        <MudText Typo="Typo.caption"
-                                                 Style="@ElapsedStyle(a.UltimCheckinAt.Value)">
-                                            @FormatElapsed((int)(_ara - a.UltimCheckinAt.Value).TotalSeconds)
-                                        </MudText>
-                                    }
                                 }
                             </MudCardContent>
                         </MudCard>
@@ -366,7 +364,7 @@
     <!-- Pannell de detall de l'estació (apareix al costat) -->
     @if (_mostraDetall && _alumneSeleccionat is not null)
     {
-        <MudItem xs="12" md="4">
+        <MudItem xs="12" md="3">
             <MudPaper Elevation="4" Style="position:sticky;top:16px;border-radius:12px;overflow:hidden">
 
                 <!-- Capçalera -->
@@ -717,6 +715,8 @@
     private System.Threading.Timer?     _uiTimer;
     private HashSet<string>             _sortideVoluntaries = [];
     private DateTime                    _ara = DateTime.UtcNow;
+    private string                      _dhcpPrefix = "192.168.100.";
+    private bool                        _historicInicialitzat;
 
     private int _connectats => _alumnes.Count(a =>
         a.Estat is EstatConnexioDto.Connectat or EstatConnexioDto.SenseCheckin);
@@ -740,6 +740,7 @@
     {
         if (!UserState.IsProfessor) return;
         Api.SetToken(UserState.Token!);
+        _dhcpPrefix = Config["Examen:DhcpNetworkPrefix"] ?? "192.168.100.";
         _carregant = true;
         _classes   = await Api.GetClassesAsync() ?? [];
         _sessions  = await Api.GetExamenSessionsAsync() ?? [];
@@ -766,6 +767,7 @@
         _sessioId = id;
         _alertes.Clear();
         _cercaHistoric = "";
+        _historicInicialitzat = false;
         await CarregarDashboard();
 
         _sessioHandler = async (eventNom, data) =>
@@ -791,9 +793,28 @@
         if (dashboard is null) return;
         _sessio  = dashboard.Sessio;
         _alumnes = dashboard.Alumnes;
-        // Elimina de _sortideVoluntaries els alumnes que ja no figuren al dashboard
         var macs = _alumnes.Select(a => a.MacAddress).ToHashSet();
         _sortideVoluntaries.IntersectWith(macs);
+
+        // Inicialitza l'historial amb l'estat actual (només en la primera càrrega de cada sessió)
+        if (!_historicInicialitzat)
+        {
+            _historicInicialitzat = true;
+            foreach (var a in _alumnes
+                .Where(a => a.Estat != EstatConnexioDto.NoConnectat)
+                .OrderBy(a => a.ConnectatAt))
+            {
+                var nom = a.Nom is not null ? $"{a.Nom} {a.Cognoms}".Trim() : a.MacAddress;
+                AfegirAlerta($"Connectat: {nom} ({a.IpAssignada ?? a.MacAddress})",
+                    Icons.Material.Filled.Link, Color.Success, nom);
+                if (a.UltimCheckinAt.HasValue)
+                    AfegirAlerta($"Check-in: {nom}",
+                        Icons.Material.Filled.CheckCircle, Color.Success, nom);
+                if (a.Estat == EstatConnexioDto.Desconnectat)
+                    AfegirAlerta($"Desconnectat: {nom}",
+                        Icons.Material.Filled.LinkOff, Color.Error, nom);
+            }
+        }
     }
 
     private async Task ProcessarEventAsync(string eventNom, object data)
@@ -989,10 +1010,10 @@
         _mostraDetall      = true;
     }
 
-    private static bool EsIpDhcp(string? ip)
+    private bool EsIpDhcp(string? ip)
     {
         if (string.IsNullOrEmpty(ip)) return true;
-        return ip.StartsWith("192.168.100.", StringComparison.Ordinal);
+        return ip.StartsWith(_dhcpPrefix, StringComparison.Ordinal);
     }
 
     private static string EstatColor(EstatConnexioDto estat) => estat switch
