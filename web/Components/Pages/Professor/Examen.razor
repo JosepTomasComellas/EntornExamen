@@ -506,6 +506,16 @@
                                 </MudText>
                             </MudStack>
                         }
+                        @if (_alumneSeleccionat.BytesEnviats.HasValue || _alumneSeleccionat.NumRequestes.HasValue)
+                        {
+                            <MudStack Row="true" Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width:72px">Tràfic</MudText>
+                                <MudText Typo="Typo.caption" Style="font-family:monospace">
+                                    @FormatBytes(_alumneSeleccionat.BytesEnviats ?? 0)
+                                    <span style="color:var(--mud-palette-text-secondary)"> · @(_alumneSeleccionat.NumRequestes ?? 0) req</span>
+                                </MudText>
+                            </MudStack>
+                        }
                     </MudStack>
 
                     <!-- Acció d'expulsió -->
@@ -1068,6 +1078,13 @@
     {
         if (seconds < 0) seconds = 0;
         return seconds < 60 ? $"fa {seconds}s" : $"fa {seconds / 60}m {seconds % 60}s";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes >= 1_048_576) return $"{bytes / 1_048_576.0:F1} MB";
+        if (bytes >= 1_024)     return $"{bytes / 1_024.0:F1} KB";
+        return $"{bytes} B";
     }
 
     public void Dispose()
