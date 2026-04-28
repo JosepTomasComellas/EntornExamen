@@ -284,7 +284,7 @@
                                     {
                                         <MudIcon Icon="@Icons.Material.Filled.WifiOff"
                                                  Color="Color.Error" Size="Size.Small"
-                                                 title="IP fora del rang DHCP (192.168.100.x)"
+                                                 title="@($"IP fora del rang DHCP ({_dhcpPrefix}x)")"
                                                  Class="ml-auto" />
                                     }
                                 </MudStack>
@@ -731,7 +731,7 @@
     private System.Threading.Timer?     _uiTimer;
     private HashSet<string>             _sortideVoluntaries = [];
     private DateTime                    _ara = DateTime.UtcNow;
-    private string                      _dhcpPrefix = "192.168.100.";
+    private string                      _dhcpPrefix = "";
     private bool                        _historicInicialitzat;
 
     private int _connectats => _alumnes.Count(a =>
@@ -756,7 +756,7 @@
     {
         if (!UserState.IsProfessor) return;
         Api.SetToken(UserState.Token!);
-        _dhcpPrefix = Config["Examen:DhcpNetworkPrefix"] ?? "192.168.100.";
+        _dhcpPrefix = Config["Examen:DhcpNetworkPrefix"] ?? "";
         _carregant = true;
         _classes   = await Api.GetClassesAsync() ?? [];
         _sessions  = await Api.GetExamenSessionsAsync() ?? [];
