@@ -8,8 +8,9 @@ namespace EntornExamen.Web.Services;
 
 public class ApiClient
 {
-    private readonly HttpClient        _http;
-    private readonly UserStateService  _userState;
+    private readonly HttpClient          _http;
+    private readonly UserStateService    _userState;
+    private readonly ExamenCircuitState  _circuitState;
 
     private static readonly JsonSerializerOptions _json = new()
     {
@@ -17,10 +18,11 @@ public class ApiClient
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public ApiClient(HttpClient http, UserStateService userState)
+    public ApiClient(HttpClient http, UserStateService userState, ExamenCircuitState circuitState)
     {
-        _http      = http;
-        _userState = userState;
+        _http         = http;
+        _userState    = userState;
+        _circuitState = circuitState;
     }
 
     public void SetToken(string token) =>
@@ -171,7 +173,7 @@ public class ApiClient
     }
 
     public Task<bool> SortirExamenAsync() =>
-        PostNoContentAsync("/api/examen/sortida", null);
+        PostWithClientIpAsync("/api/examen/sortida");
 
     public Task<bool> SortirCircuitAsync(int studentId) =>
         PostNoContentAsync($"/api/examen/sortida-circuit/{studentId}", null);
@@ -181,7 +183,9 @@ public class ApiClient
 
     public async Task<(CheckinResponse? Resp, string? Error)> ExamenCheckinAsync(CheckinRequest req)
     {
-        var resp = await _http.PostAsync("/api/examen/checkin", Json(req));
+        var msg = new HttpRequestMessage(HttpMethod.Post, "/api/examen/checkin") { Content = Json(req) };
+        AfegirCapcaleraIp(msg);
+        var resp = await _http.SendAsync(msg);
         if (resp.IsSuccessStatusCode)
             return (await resp.Content.ReadFromJsonAsync<CheckinResponse>(_json), null);
         try
@@ -341,6 +345,23 @@ public class ApiClient
     private async Task<bool> PostNoContentAsync(string url, object? body)
     {
         var resp = await _http.PostAsync(url, Json(body));
+        if (!resp.IsSuccessStatusCode) { CheckUnauthorized(resp); return false; }
+        return true;
+    }
+
+    // Reenvia la IP real del client cap a l'API (capturada per App.razor des de X-Real-IP de nginx).
+    // Necessari perquè les crides web→api van de contenidor a contenidor i l'API veuria la IP del web.
+    private void AfegirCapcaleraIp(HttpRequestMessage req)
+    {
+        if (!string.IsNullOrEmpty(_circuitState.ClientIp))
+            req.Headers.TryAddWithoutValidation("X-Forwarded-For", _circuitState.ClientIp);
+    }
+
+    private async Task<bool> PostWithClientIpAsync(string url)
+    {
+        var msg = new HttpRequestMessage(HttpMethod.Post, url);
+        AfegirCapcaleraIp(msg);
+        var resp = await _http.SendAsync(msg);
         if (!resp.IsSuccessStatusCode) { CheckUnauthorized(resp); return false; }
         return true;
     }

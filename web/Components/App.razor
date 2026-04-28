@@ -32,22 +32,37 @@
 </html>
 
 @code {
-    // App.razor s'executa com a SSR (thread HTTP) → llegim la cultura establerta
-    // per RequestLocalizationMiddleware i la fixem com a DefaultThreadCurrentCulture
-    // perquè els threads del circuit Blazor Server l'heretin.
+    // App.razor s'executa en el thread HTTP inicial → llegim HttpContext aquí.
     [CascadingParameter]
     private HttpContext? HttpContext { get; set; }
+
+    [Inject] private EntornExamen.Web.Services.ExamenCircuitState CircuitState { get; set; } = default!;
 
     protected override void OnInitialized()
     {
         if (HttpContext is not null)
         {
+            // Cultura: propagada als threads del circuit Blazor Server
             var feature = HttpContext.Features.Get<IRequestCultureFeature>();
             if (feature is not null)
             {
                 CultureInfo.DefaultThreadCurrentCulture   = feature.RequestCulture.Culture;
                 CultureInfo.DefaultThreadCurrentUICulture = feature.RequestCulture.UICulture;
             }
+
+            // IP real del client: nginx envia X-Real-IP amb la IP original ja resolta
+            // (després que el mòdul real_ip hagi processat X-Forwarded-For).
+            // Guardem-la al circuit perquè ApiClient la reenvïi cap a l'API.
+            var ip = HttpContext.Request.Headers["X-Real-IP"].FirstOrDefault()
+                  ?? HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()
+                         ?.Split(',')[0].Trim()
+                  ?? HttpContext.Connection.RemoteIpAddress?.ToString()
+                  ?? "";
+
+            if (System.Net.IPAddress.TryParse(ip, out var addr) && addr.IsIPv4MappedToIPv6)
+                ip = addr.MapToIPv4().ToString();
+
+            CircuitState.ClientIp = ip;
         }
     }
 }
