@@ -2,7 +2,7 @@ namespace EntornExamen.Shared;
 
 public static class AppVersion
 {
-    public const string Current  = "2.7.1";
+    public const string Current  = "2.7.2";
     public const string Name     = "EntornExamen";
-    public const string ChangeLog = "v2.7.1: correccions — botó eliminar sessió, historial per sessió, temps endarrerit només per actius, DNS take(15), auto-validació suggerència correu";
+    public const string ChangeLog = "v2.7.2: fix crític icona sortida voluntària (deserialitzador Redis), rate limit checkin eliminat, health públic, expulsar consistent, OnEmailKeyDown async";
 }

@@ -509,7 +509,7 @@ app.MapGet("/api/health", async (AppDbContext db, StackExchange.Redis.IConnectio
     try { redisOk = redis.IsConnected; }                      catch { }
     var status = dbOk && redisOk ? "ok" : "degraded";
     return Results.Ok(new { status, db = dbOk ? "ok" : "error", redis = redisOk ? "ok" : "error" });
-}).RequireAuthorization();
+}); // Públic: permet monitoratge extern i Docker healthchecks sense token
 
 // ════════════════════════════════════════════════════════════════════════════
 // ESTADÍSTIQUES D'ÚS (admin only)
@@ -778,6 +778,8 @@ app.MapGet("/api/examen/sessions/{id:int}/dashboard", async (int id, IExamenServ
 }).RequireAuthorization();
 
 // ── Check-in alumne (sense autenticació — xarxa local tancada) ────────────────
+// No s'aplica rate limiting: els alumnes fan check-in periòdicament (N/minut per classe)
+// i la xarxa d'examen és una WiFi aïllada sense accés extern.
 app.MapPost("/api/examen/checkin", async (CheckinRequest req, IExamenService svc, HttpContext ctx) =>
 {
     if (string.IsNullOrWhiteSpace(req.Email))
@@ -788,7 +790,7 @@ app.MapPost("/api/examen/checkin", async (CheckinRequest req, IExamenService svc
     return error is not null
         ? Results.UnprocessableEntity(new { error })
         : Results.Ok(resp);
-}).RequireRateLimiting("auth");
+});
 
 // ── Sortida voluntària alumne ──────────────────────────────────────────────────
 app.MapPost("/api/examen/sortida", async (IExamenService svc, HttpContext ctx) =>
@@ -802,9 +804,8 @@ app.MapPost("/api/examen/sortida", async (IExamenService svc, HttpContext ctx) =
 app.MapPost("/api/examen/sessions/{sessioId:int}/alumnes/{studentId:int}/expulsar",
     async (int sessioId, int studentId, IExamenService svc, ClaimsPrincipal user) =>
 {
-    var profId  = int.Parse(user.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-    var isAdmin = user.FindFirst("IsAdmin")?.Value == "true";
-    var (ok, error) = await svc.ExpulsarAsync(sessioId, studentId, profId, isAdmin);
+    if (!IsProfessor(user)) return Results.Forbid();
+    var (ok, error) = await svc.ExpulsarAsync(sessioId, studentId, GetUserId(user), IsAdmin(user));
     return ok ? Results.Ok() : Results.NotFound(new { error });
 }).RequireAuthorization();
 

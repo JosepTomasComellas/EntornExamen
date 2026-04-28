@@ -239,9 +239,9 @@
 
     private Func<string, object, Task>? _alumneHandler;
 
-    private void OnEmailKeyDown(KeyboardEventArgs e)
+    private async Task OnEmailKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter") _ = ValidarEmail();
+        if (e.Key == "Enter") await ValidarEmail();
     }
 
     private async Task ValidarEmail()

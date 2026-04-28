@@ -1,4 +1,4 @@
-# EntornExamen · v2.7.1
+# EntornExamen · v2.7.2
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 
@@ -295,6 +295,13 @@ dotnet test AutoCo.Tests/
 ---
 
 ## Changelog
+
+### v2.7.2 (2026-04-28)
+- Fix crític: la icona de sortida voluntària al plafó professor **mai apareixia** — l'event `AlumneDesconnectatVoluntari` no estava al deserialitzador Redis i arribava com a `object` buit, fent fallar el pattern match
+- Fix: l'endpoint d'expulsió d'alumne llegia les claims de forma diferent a la resta d'endpoints (podia llançar `NullReferenceException`); ara usa els helpers `GetUserId`/`IsAdmin` com tots els altres
+- Fix: el check-in d'alumnes tenia el rate limit "auth" (10 req/min global) que bloquearia check-ins legítims en una classe de >10 alumnes; eliminat (la xarxa d'examen és una WiFi aïllada)
+- Fix: `/api/health` requeria autenticació — ara és públic per a monitoratge extern
+- Fix: `OnEmailKeyDown` descartava el `Task` de `ValidarEmail` (fire-and-forget); ara és `async Task`
 
 ### v2.7.1 (2026-04-28)
 - Fix: botó "Eliminar sessió" de la barra no assignava `_sessioAEliminar` — l'eliminació no es feia
