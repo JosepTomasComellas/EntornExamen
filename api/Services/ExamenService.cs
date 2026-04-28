@@ -156,7 +156,7 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 r.StudentId.HasValue ? TryFotoUrl(r.StudentId.Value) : null,
                 r.MacAddress, r.IpAssignada,
                 r.ConnectatAt, r.UltimCheckinAt, (EstatConnexioDto)(int)r.Estat,
-                r.PeticiosDns.OrderByDescending(p => p.Timestamp).Take(10)
+                r.PeticiosDns.OrderByDescending(p => p.Timestamp).Take(15)
                     .Select(p => new PeticioTdnsDto(p.Id, p.Domini, p.Timestamp, p.EsExterna))
                     .ToList()))
             .ToList();
@@ -371,12 +371,11 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         _ = hub.NotificaNouCheckinAsync(sessio.Id, new ExamenEventAlumne(
             student.Id, student.Nom, student.Cognoms, clientIp, mac, ara));
 
-        var interval = int.TryParse(config["Examen:CheckinIntervalSeconds"], out var iv) ? iv : 30;
         return (new CheckinResponse(
             new CheckinAlumneInfo(student.Id, student.Nom, student.Cognoms,
                 student.Class.Name, TryFotoUrl(student.Id)),
             new CheckinSessioInfo(sessio.Id, sessio.Titol, sessio.Descripcio,
-                sessio.MissatgeActiu, interval)),
+                sessio.MissatgeActiu, CheckinIntervalSegons)),
             null);
     }
 

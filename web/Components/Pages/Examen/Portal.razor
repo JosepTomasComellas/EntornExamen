@@ -34,7 +34,7 @@
                     @if (_suggeriment is not null)
                     {
                         <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4"
-                                  OnClick="@(() => { _email = _suggeriment; _suggeriment = null; })"
+                                  OnClick="@(async () => { _email = _suggeriment!; _suggeriment = null; await ValidarEmail(); })"
                                   Style="cursor:pointer">
                             @Loc["ExamenPortal_SuggestEmail", _suggeriment]
                         </MudAlert>

@@ -1,4 +1,4 @@
-# EntornExamen · v2.7.0
+# EntornExamen · v2.7.1
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 
@@ -295,6 +295,17 @@ dotnet test AutoCo.Tests/
 ---
 
 ## Changelog
+
+### v2.7.1 (2026-04-28)
+- Fix: botó "Eliminar sessió" de la barra no assignava `_sessioAEliminar` — l'eliminació no es feia
+- Fix: l'historial de connexions no s'esborrava en canviar de sessió (entrades de sessions anteriors persistien)
+- Fix: el botó "Netejar" de l'historial no buidava el camp de cerca; ara fa ambdues coses
+- Fix: el temps endarrerit ("fa Xs") apareixia en targetes d'alumnes desconnectats; ara només per a Connectat/SenseCheckin
+- Fix: `EliminarSessio` no netejar l'historial quan s'elimina la sessió seleccionada
+- Fix: DNS del dashboard retornava 10 entrades però la UI mostrava fins a 15; ara el servidor envia 15
+- Fix: `CheckinAsync` re-parsejava la variable de config de l'interval en lloc d'usar la propietat compartida
+- Millora: clicar la suggerència de correu al portal d'alumne valida directament sense necessitat de prémer Continuar
+- Millora: `SeleccionarSessio` amb la mateixa sessió ja seleccionada recarrega el dashboard sense re-subscriure
 
 ### v2.7.0 (2026-04-28)
 - Llista de sessions recents visible a tots els professors (substitueix el MudSelect d'admin): estat, classe, títol, data d'inici/tancament; botó d'eliminació directa a les sessions tancades
