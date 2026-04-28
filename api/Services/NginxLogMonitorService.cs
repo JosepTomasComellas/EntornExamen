@@ -22,14 +22,14 @@ public class NginxLogMonitorService(
 
         while (!ct.IsCancellationRequested)
         {
-            try { await ProcessarLogAsync(); }
+            try { await ProcessarLogAsync(ct); }
             catch (Exception ex) { logger.LogWarning(ex, "Error processant log nginx"); }
 
             await Task.Delay(TimeSpan.FromSeconds(5), ct);
         }
     }
 
-    private async Task ProcessarLogAsync()
+    private async Task ProcessarLogAsync(CancellationToken ct)
     {
         if (!File.Exists(LogPath)) return;
 
