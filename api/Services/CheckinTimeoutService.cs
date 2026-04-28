@@ -18,11 +18,15 @@ public class CheckinTimeoutService(
     private int IntervalSegons =>
         int.TryParse(config["Examen:CheckinIntervalSeconds"], out var iv) ? iv : 30;
 
-    private int SenseCheckinFactor =>
-        int.TryParse(config["Examen:SenseCheckinFactor"], out var f) && f > 0 ? f : 2;
+    private double SenseCheckinFactor =>
+        double.TryParse(config["Examen:SenseCheckinFactor"],
+            System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var f) && f > 0 ? f : 2.0;
 
-    private int DesconnectatFactor =>
-        int.TryParse(config["Examen:DesconnectatFactor"], out var f) && f > 0 ? f : 4;
+    private double DesconnectatFactor =>
+        double.TryParse(config["Examen:DesconnectatFactor"],
+            System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var f) && f > 0 ? f : 4.0;
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
