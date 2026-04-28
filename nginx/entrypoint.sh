@@ -17,4 +17,11 @@ else
     echo "[nginx] Certificat SSL trobat. Usant el certificat existent."
 fi
 
+# Assegura que el directori de logs existeix i el fitxer és accessible
+# (el volum nginx-logs s'ha muntat a /var/log/nginx)
+mkdir -p /var/log/nginx
+touch /var/log/nginx/access.log
+# error.log apunta a stderr (per veure errors de nginx a docker logs)
+ln -sf /dev/stderr /var/log/nginx/error.log 2>/dev/null || true
+
 exec nginx -g "daemon off;"

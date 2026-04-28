@@ -3,11 +3,12 @@ networks:
     driver: bridge
 
 volumes:
-  db-data:      # Volum Docker per a SQL Server (NTFS via WSL2 no és compatible amb SQLPAL)
-  redis-data:   # Volum per a Redis (persistència AOF)
-  dp-keys:      # Claus de DataProtection (antiforgery, ProtectedLocalStorage)
-  api-backups:  # Còpies de seguretat JSON (exportació/importació)
+  db-data:       # Volum Docker per a SQL Server (NTFS via WSL2 no és compatible amb SQLPAL)
+  redis-data:    # Volum per a Redis (persistència AOF)
+  dp-keys:       # Claus de DataProtection (antiforgery, ProtectedLocalStorage)
+  api-backups:   # Còpies de seguretat JSON (exportació/importació)
   fotos-alumnes: # Fotos d'alumnes per a l'Entorn Examen
+  nginx-logs:    # Logs JSON d'accés nginx, compartit amb l'API per a estadístiques de tràfic
 
 services:
 
@@ -18,6 +19,7 @@ services:
       ACCEPT_EULA:        "Y"
       MSSQL_SA_PASSWORD:  "${MSSQL_SA_PASSWORD}"
       MSSQL_PID:          "Express"
+      TZ:                 "${TZ:-Europe/Madrid}"
     expose:
       - "1433"
     volumes:
@@ -39,6 +41,8 @@ services:
     image: redis:7-alpine
     container_name: entornexamen-redis
     command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy volatile-lru
+    environment:
+      TZ: "${TZ:-Europe/Madrid}"
     expose:
       - "6379"
     volumes:
@@ -77,13 +81,18 @@ services:
       Smtp__FromName:               "${SMTP_FROM_NAME}"
       App__WebUrl:                  "${APP_WEB_URL}"
       Redis__ConnectionString:      "redis:6379"
+      TZ:                             "${TZ:-Europe/Madrid}"
+      Logging__LogLevel__Default:     "${LOG_LEVEL:-Warning}"
+      Logging__LogLevel__EntornExamen: "Information"
       Examen__DominiEmail:            "${EXAMEN_DOMINI_EMAIL:-sarria.salesians.cat}"
       Examen__CheckinIntervalSeconds: "${EXAMEN_CHECKIN_INTERVAL_SECONDS:-30}"
       Examen__SenseCheckinFactor:     "${EXAMEN_SENSE_CHECKIN_FACTOR:-2}"
       Examen__DesconnectatFactor:     "${EXAMEN_DESCONNECTAT_FACTOR:-4}"
-      Examen__DhcpLeasesPath:       "/data/dhcpd.leases"
-      Examen__DnsLogPath:           "/data/dns-queries.log"
-      Examen__WebWwwrootPath:       "/app/wwwroot"
+      Examen__ModePro:                "${EXAMEN_MODE_PRO:-false}"
+      Examen__DhcpLeasesPath:         "/data/dhcpd.leases"
+      Examen__DnsLogPath:             "/data/dns-queries.log"
+      Examen__NginxLogPath:           "/data/nginx/access.log"
+      Examen__WebWwwrootPath:         "/app/wwwroot"
     expose:
       - "8080"
     volumes:
@@ -91,6 +100,7 @@ services:
       - fotos-alumnes:/app/wwwroot/fotos/alumnes
       - /var/lib/dhcp/dhcpd.leases:/data/dhcpd.leases:ro
       - /var/log/named/queries.log:/data/dns-queries.log:ro
+      - nginx-logs:/data/nginx:ro
     networks:
       - entornexamen-net
     depends_on:
@@ -107,6 +117,10 @@ services:
     container_name: entornexamen-web
     environment:
       ASPNETCORE_ENVIRONMENT:  Production
+      TZ:                      "${TZ:-Europe/Madrid}"
+      Logging__LogLevel__Default:     "${LOG_LEVEL:-Warning}"
+      Logging__LogLevel__EntornExamen: "Information"
+      Logging__LogLevel__Microsoft.AspNetCore.Antiforgery: "Critical"
       ApiSettings__BaseUrl:    "http://api:8080"
       Redis__ConnectionString: "redis:6379"
       Examen__DhcpNetworkPrefix: "${EXAMEN_DHCP_NETWORK_PREFIX:-192.168.100.}"
@@ -125,10 +139,13 @@ services:
       context:    ./nginx
       dockerfile: Dockerfile
     container_name: entornexamen-nginx
+    environment:
+      TZ: "${TZ:-Europe/Madrid}"
     ports:
       - "4445:443"
     volumes:
       - ./nginx/ssl:/etc/nginx/ssl
+      - nginx-logs:/var/log/nginx
     networks:
       - entornexamen-net
     depends_on:

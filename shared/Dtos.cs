@@ -144,11 +144,13 @@ public record ExamenDashboardDto(
     List<ExamenAlumneDto> Alumnes);
 
 public record ExamenAlumneDto(
+    int RegistreId,
     int? StudentId, string? Nom, string? Cognoms, string? Email,
     int? NumLlista, string? FotoUrl,
     string MacAddress, string? IpAssignada,
     DateTime ConnectatAt, DateTime? UltimCheckinAt, EstatConnexioDto Estat,
-    List<PeticioTdnsDto> DnsRecents);
+    List<PeticioTdnsDto> DnsRecents,
+    long? BytesEnviats = null, int? NumRequestes = null);
 
 // ─── Importació alumnes ───────────────────────────────────────────────────────
 public record ImportacioAlumnesResult(

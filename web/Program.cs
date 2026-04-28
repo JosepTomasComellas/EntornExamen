@@ -1,5 +1,6 @@
 using EntornExamen.Web;
 using EntornExamen.Web.Services;
+using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Localization;
@@ -22,7 +23,14 @@ var redis = await ConnectionMultiplexer.ConnectAsync(redisConn);
 builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
 
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents(options =>
+    {
+        // Temps màxim per reconnectar-se; passat aquest temps el circuit es destrueix
+        // i Dispose() de Portal.razor para el timer de check-in.
+        // El CircuitHandler (15 s) actua abans d'aquest timeout.
+        options.DisconnectedCircuitMaxRetained = 100;
+        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromSeconds(40);
+    });
 
 builder.Services.AddSignalR()
     .AddStackExchangeRedis(redisConn, opts =>
@@ -56,6 +64,10 @@ builder.Services.AddDataProtection()
 
 // Estat de l'usuari (substitueix ISession + SessionHelper)
 builder.Services.AddScoped<UserStateService>();
+
+// ── Entorn Examen: gestió de circuit Blazor (detecta tancament de navegador) ──
+builder.Services.AddScoped<ExamenCircuitState>();
+builder.Services.AddScoped<CircuitHandler, ExamenCircuitHandler>();
 
 // ── Entorn Examen: notificacions temps real ────────────────────────────────────
 builder.Services.AddSingleton<ExamenNotificationService>();

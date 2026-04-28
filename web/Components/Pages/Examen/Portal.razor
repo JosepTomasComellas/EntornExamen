@@ -3,6 +3,7 @@
 @inject ApiClient Api
 @inject ExamenNotificationService ExamenNotif
 @inject IStringLocalizer<SharedResources> Loc
+@inject ExamenCircuitState CircuitState
 @implements IDisposable
 
 <PageTitle>@Loc["ExamenPortal_Title"] — Salesians de Sarrià</PageTitle>
@@ -283,6 +284,9 @@
             _segonsRestants = resp.Sessio.IntervalSegons;
             _fase           = Fase.Connectat;
 
+            CircuitState.StudentId = resp.Alumne.StudentId;
+            CircuitState.Email     = _email.Trim();
+
             if (!string.IsNullOrWhiteSpace(resp.Sessio.MissatgeActiu))
             {
                 _missatgeProfessor = resp.Sessio.MissatgeActiu;
@@ -313,6 +317,8 @@
                     _errorEmail  = Loc["ExamenPortal_SessionEnded"].Value;
                     _timer?.Dispose();
                     _timer = null;
+                    CircuitState.StudentId = null;
+                    CircuitState.Email     = null;
                     await InvokeAsync(StateHasChanged);
                     break;
                 case "AlumneExpulsat":
@@ -337,6 +343,8 @@
         _errorEmail   = null;
         _timer?.Dispose();
         _timer = null;
+        CircuitState.StudentId = null;
+        CircuitState.Email     = null;
         if (_alumneHandler is not null && studentId.HasValue)
             ExamenNotif.DesubscriuAlumne(studentId.Value, _alumneHandler);
         _alumneHandler = null;
@@ -352,6 +360,8 @@
         _errorEmail      = Loc["ExamenPortal_ExpulsatMsg"].Value;
         _timer?.Dispose();
         _timer = null;
+        CircuitState.StudentId = null;
+        CircuitState.Email     = null;
         if (_alumneHandler is not null && studentId.HasValue)
             ExamenNotif.DesubscriuAlumne(studentId.Value, _alumneHandler);
         _alumneHandler = null;
@@ -382,6 +392,8 @@
     public void Dispose()
     {
         _timer?.Dispose();
+        CircuitState.StudentId = null;
+        CircuitState.Email     = null;
         var studentId = _checkinResp?.Alumne.StudentId;
         if (_alumneHandler is not null && studentId.HasValue)
             ExamenNotif.DesubscriuAlumne(studentId.Value, _alumneHandler);

@@ -28,6 +28,7 @@ public interface IExamenService
     Task<(ImportacioFotosResult Result, string? Error)> ImportarFotosAsync(Stream zipStream, string wwwrootPath);
     Task<(bool Ok, string? Error)> EliminarSessioAsync(int sessioId, int professorId, bool isAdmin);
     Task<(bool Ok, string? Error)> SortirAsync(string clientIp);
+    Task<(bool Ok, string? Error)> SortirPerStudentAsync(int studentId);
     Task<(bool Ok, string? Error)> ExpulsarAsync(int sessioId, int studentId, int professorId, bool isAdmin);
     Task<List<AlumneMacDto>> GetMacsAsync(bool isAdmin);
     Task<bool> DeleteMacAsync(int id, bool isAdmin);
@@ -151,6 +152,7 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             .OrderBy(r => r.Student?.NumLlista ?? int.MaxValue)
             .ThenBy(r => r.Student?.Cognoms ?? r.MacAddress)
             .Select(r => new ExamenAlumneDto(
+                r.Id,
                 r.StudentId, r.Student?.Nom, r.Student?.Cognoms, r.Student?.Email,
                 r.Student?.NumLlista,
                 r.StudentId.HasValue ? TryFotoUrl(r.StudentId.Value) : null,
@@ -158,7 +160,8 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 r.ConnectatAt, r.UltimCheckinAt, (EstatConnexioDto)(int)r.Estat,
                 r.PeticiosDns.OrderByDescending(p => p.Timestamp).Take(15)
                     .Select(p => new PeticioTdnsDto(p.Id, p.Domini, p.Timestamp, p.EsExterna))
-                    .ToList()))
+                    .ToList(),
+                r.BytesEnviats, r.NumRequestes))
             .ToList();
 
         return new ExamenDashboardDto(sessioDto, alumnes);
@@ -324,21 +327,25 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             return (null, "No hi ha examen actiu per a la teva classe.");
 
         var ara = DateTime.UtcNow;
+        var modePro = bool.TryParse(config["Examen:ModePro"], out var mp) && mp;
 
-        // Busca el registre de connexió per IP (assignada per DHCP) o per alumne ja identificat
+        // Comprovació d'una sola estació (desactivada en mode proves)
+        if (!modePro)
+        {
+            var altreRegistre = await db.RegistresConnexio
+                .FirstOrDefaultAsync(r => r.SessioId == sessio.Id &&
+                    r.StudentId == student.Id &&
+                    r.IpAssignada != clientIp &&
+                    r.Estat != EstatConnexio.Desconnectat);
+            if (altreRegistre is not null)
+                return (null, $"Ja estàs connectat des d'una altra estació ({altreRegistre.IpAssignada}).");
+        }
+
+        // Busca el registre: en mode proves, cerca NOMÉS per alumne (evita conflictes d'IP duplicada)
         var registre = await db.RegistresConnexio
             .FirstOrDefaultAsync(r => r.SessioId == sessio.Id &&
                 (r.StudentId == student.Id ||
-                 (!string.IsNullOrEmpty(clientIp) && r.IpAssignada == clientIp)));
-
-        // Comprovació d'una sola estació: sempre comprova si l'alumne té un registre actiu des d'una altra IP
-        var altreRegistre = await db.RegistresConnexio
-            .FirstOrDefaultAsync(r => r.SessioId == sessio.Id &&
-                r.StudentId == student.Id &&
-                r.IpAssignada != clientIp &&
-                r.Estat != EstatConnexio.Desconnectat);
-        if (altreRegistre is not null)
-            return (null, $"Ja estàs connectat des d'una altra estació ({altreRegistre.IpAssignada}).");
+                 (!modePro && !string.IsNullOrEmpty(clientIp) && r.IpAssignada == clientIp)));
 
         string mac = "";
         if (registre is not null)
@@ -520,6 +527,30 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         _ = hub.NotificaSortidaVoluntariaAsync(registre.SessioId, new ExamenEventAlumne(
             registre.StudentId, registre.Student?.Nom, registre.Student?.Cognoms,
             clientIp, registre.MacAddress, registre.DesconnectatAt.Value));
+
+        return (true, null);
+    }
+
+    public async Task<(bool Ok, string? Error)> SortirPerStudentAsync(int studentId)
+    {
+        var ara = DateTime.UtcNow;
+        var registre = await db.RegistresConnexio
+            .Include(r => r.Student)
+            .Include(r => r.Sessio)
+            .FirstOrDefaultAsync(r => r.StudentId == studentId &&
+                r.Estat != EstatConnexio.Desconnectat &&
+                r.Sessio.Activa);
+
+        if (registre is null)
+            return (false, "No s'ha trobat cap connexió activa per a aquest alumne.");
+
+        registre.Estat          = EstatConnexio.Desconnectat;
+        registre.DesconnectatAt = ara;
+        await db.SaveChangesAsync();
+
+        _ = hub.NotificaAlumneDesconnectatAsync(registre.SessioId, new ExamenEventAlumne(
+            registre.StudentId, registre.Student?.Nom, registre.Student?.Cognoms,
+            registre.IpAssignada, registre.MacAddress, ara));
 
         return (true, null);
     }

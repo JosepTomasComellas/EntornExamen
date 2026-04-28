@@ -66,6 +66,7 @@ builder.Services.AddHostedService<DhcpMonitorService>();
 builder.Services.AddHostedService<DnsMonitorService>();
 builder.Services.AddHostedService<SessioCleanupService>();
 builder.Services.AddHostedService<CheckinTimeoutService>();
+builder.Services.AddHostedService<NginxLogMonitorService>();
 
 // ── Redis (caché de resultats) ─────────────────────────────────────────────────
 var redisConn = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
@@ -192,6 +193,13 @@ using (var scope = app.Services.CreateScope())
         ELSE IF COL_LENGTH('RegistresConnexio', 'IpAssignada') < 45
         BEGIN
             ALTER TABLE [RegistresConnexio] ALTER COLUMN [IpAssignada] NVARCHAR(45) NULL;
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                       WHERE TABLE_NAME = 'RegistresConnexio' AND COLUMN_NAME = 'BytesEnviats')
+        BEGIN
+            ALTER TABLE [RegistresConnexio] ADD [BytesEnviats] BIGINT NULL;
+            ALTER TABLE [RegistresConnexio] ADD [NumRequestes] INT NULL;
         END
 
         IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'PeticiosDns')
@@ -818,6 +826,15 @@ app.MapPost("/api/examen/sortida", async (IExamenService svc, HttpContext ctx) =
 {
     var clientIp = ctx.Connection.RemoteIpAddress?.ToString() ?? "";
     var (ok, error) = await svc.SortirAsync(clientIp);
+    return ok ? Results.Ok() : Results.NotFound(new { error });
+});
+
+// ── Sortida per circuit tancat (crida interna del web Blazor Server) ───────────
+// Cridat pel ExamenCircuitHandler quan detecta que el navegador de l'alumne s'ha tancat.
+// No necessita JWT: accessible únicament des de la xarxa Docker interna.
+app.MapPost("/api/examen/sortida-circuit/{studentId:int}", async (int studentId, IExamenService svc) =>
+{
+    var (ok, error) = await svc.SortirPerStudentAsync(studentId);
     return ok ? Results.Ok() : Results.NotFound(new { error });
 });
 

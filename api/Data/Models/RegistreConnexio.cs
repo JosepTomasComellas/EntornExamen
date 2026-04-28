@@ -19,6 +19,8 @@ public class RegistreConnexio
     public DateTime? DesconnectatAt  { get; set; }
     public DateTime? UltimCheckinAt  { get; set; }
     public EstatConnexio Estat       { get; set; } = EstatConnexio.NoConnectat;
+    public long?    BytesEnviats     { get; set; }
+    public int?     NumRequestes     { get; set; }
 
     public SessioExamen   Sessio  { get; set; } = null!;
     public Student?       Student { get; set; }
