@@ -671,7 +671,8 @@
         <MudTextField @bind-Value="_textMissatge"
                       Label="@Loc["Examen_MessageLabel"]"
                       Variant="Variant.Outlined" Lines="3"
-                      MaxLength="500" Counter="500" />
+                      MaxLength="500" Counter="500"
+                      OnKeyDown="OnMissatgeKeyDown" />
         @if (_sessio?.MissatgeActiu is not null)
         {
             <MudAlert Severity="Severity.Info" Class="mt-2" Dense="true">
@@ -955,6 +956,12 @@
         _sessions = await Api.GetExamenSessionsAsync() ?? [];
         await CarregarDashboard();
         StateHasChanged();
+    }
+
+    private async Task OnMissatgeKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+            await EnviarMissatge();
     }
 
     private async Task EnviarMissatge()
