@@ -378,9 +378,9 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
 
         await db.SaveChangesAsync();
 
-        // Notifica el professor
+        // Notifica el professor (usa registre.MacAddress com a clau, no mac local que pot ser "")
         _ = hub.NotificaNouCheckinAsync(sessio.Id, new ExamenEventAlumne(
-            student.Id, student.Nom, student.Cognoms, clientIp, mac, ara));
+            student.Id, student.Nom, student.Cognoms, clientIp, registre.MacAddress, ara));
 
         return (new CheckinResponse(
             new CheckinAlumneInfo(student.Id, student.Nom, student.Cognoms,

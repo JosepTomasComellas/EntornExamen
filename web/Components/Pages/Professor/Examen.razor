@@ -826,19 +826,19 @@
         switch (eventNom)
         {
             case "AlumneConnectat" when data is ExamenEventAlumne evt:
-                ActualitzarAlumne(evt.Mac, a => a with
-                {
-                    Estat = EstatConnexioDto.Connectat, IpAssignada = evt.Ip
-                });
-                AfegirAlerta($"Connectat: {evt.Nom} {evt.Cognoms} ({evt.Ip})",
+            {
+                var nomAlerta = $"{evt.Nom} {evt.Cognoms}".Trim();
+                if (string.IsNullOrEmpty(nomAlerta)) nomAlerta = evt.Mac ?? evt.Ip ?? "?";
+                if (!ActualitzarAlumne(evt.Mac, a => a with
+                    { Estat = EstatConnexioDto.Connectat, IpAssignada = evt.Ip }))
+                    await CarregarDashboard();
+                AfegirAlerta($"Connectat: {nomAlerta} ({evt.Ip})",
                     Icons.Material.Filled.Link, Color.Success,
-                    $"{evt.Nom} {evt.Cognoms}".Trim());
+                    string.IsNullOrEmpty($"{evt.Nom} {evt.Cognoms}".Trim()) ? null : $"{evt.Nom} {evt.Cognoms}".Trim());
                 break;
+            }
             case "AlumneDesconnectat" when data is ExamenEventAlumne evt:
-                ActualitzarAlumne(evt.Mac, a => a with
-                {
-                    Estat = EstatConnexioDto.Desconnectat
-                });
+                ActualitzarAlumne(evt.Mac, a => a with { Estat = EstatConnexioDto.Desconnectat });
                 AfegirAlerta($"Desconnectat: {evt.Nom} {evt.Cognoms}",
                     Icons.Material.Filled.LinkOff, Color.Error,
                     $"{evt.Nom} {evt.Cognoms}".Trim());
@@ -846,21 +846,25 @@
                 break;
             case "AlumneDesconnectatVoluntari" when data is ExamenEventAlumne evt:
                 _sortideVoluntaries.Add(evt.Mac);
-                ActualitzarAlumne(evt.Mac, a => a with
-                {
-                    Estat = EstatConnexioDto.Desconnectat
-                });
+                ActualitzarAlumne(evt.Mac, a => a with { Estat = EstatConnexioDto.Desconnectat });
                 AfegirAlerta($"Ha sortit voluntàriament: {evt.Nom} {evt.Cognoms}",
                     Icons.Material.Filled.ExitToApp, Color.Warning,
                     $"{evt.Nom} {evt.Cognoms}".Trim());
                 break;
             case "NouCheckin" when data is ExamenEventAlumne evt:
-                ActualitzarAlumne(evt.Mac, a => a with
+            {
+                var trobat = ActualitzarAlumne(evt.Mac, a => a with
+                    { Estat = EstatConnexioDto.Connectat, UltimCheckinAt = evt.Timestamp });
+                if (!trobat)
                 {
-                    Estat = EstatConnexioDto.Connectat,
-                    UltimCheckinAt = evt.Timestamp
-                });
+                    // Primer check-in sense DHCP previ → l'alumne no era a la llista
+                    await CarregarDashboard();
+                    AfegirAlerta($"Connectat: {evt.Nom} {evt.Cognoms} ({evt.Ip})",
+                        Icons.Material.Filled.Link, Color.Success,
+                        $"{evt.Nom} {evt.Cognoms}".Trim());
+                }
                 break;
+            }
             case "NovaPeticioExterna" when data is ExamenEventDns evt:
                 AfegirAlerta($"DNS externa: {evt.Nom} → {evt.Domini}",
                     Icons.Material.Filled.Warning, Color.Warning, evt.Nom);
@@ -868,6 +872,7 @@
             case "MacDesconeguda" when data is ExamenEventAlumne evt:
                 AfegirAlerta($"MAC desconeguda: {evt.Mac} ({evt.Ip})",
                     Icons.Material.Filled.DeviceUnknown, Color.Secondary);
+                await CarregarDashboard();
                 break;
             case "MissatgeActualitzat" when data is ExamenEventMissatge msg:
                 if (_sessio is not null) _sessio = _sessio with { MissatgeActiu = msg.Text };
@@ -877,15 +882,14 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private void ActualitzarAlumne(string mac, Func<ExamenAlumneDto, ExamenAlumneDto> update)
+    private bool ActualitzarAlumne(string mac, Func<ExamenAlumneDto, ExamenAlumneDto> update)
     {
         var idx = _alumnes.FindIndex(a => a.MacAddress == mac);
-        if (idx >= 0)
-        {
-            _alumnes[idx] = update(_alumnes[idx]);
-            if (_alumneSeleccionat?.MacAddress == mac)
-                _alumneSeleccionat = _alumnes[idx];
-        }
+        if (idx < 0) return false;
+        _alumnes[idx] = update(_alumnes[idx]);
+        if (_alumneSeleccionat?.MacAddress == mac)
+            _alumneSeleccionat = _alumnes[idx];
+        return true;
     }
 
     private void AfegirAlerta(string text, string icona, Color color, string? alumne = null)
