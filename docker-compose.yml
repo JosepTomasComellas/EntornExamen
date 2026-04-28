@@ -133,6 +133,8 @@ services:
       Brand__ColorAppBar:  "${BRAND_COLOR_APPBAR:-#1e293b}"
       Brand__LogoUrl:      "${BRAND_LOGO_URL:-/images/logo2.png}"
       Brand__BgImageUrl:   "${BRAND_BG_IMAGE_URL:-/images/fons-salesians.png}"
+    ports:
+      - "127.0.0.1:8081:8080"   # accessible des del host per a nginx (network_mode: host)
     volumes:
       - dp-keys:/app/dp-keys
       - fotos-alumnes:/app/wwwroot/fotos/alumnes
@@ -149,15 +151,12 @@ services:
       context:    ./nginx
       dockerfile: Dockerfile
     container_name: entornexamen-nginx
+    network_mode: host          # veu IPs reals dels alumnes (evita el SNAT de Docker)
     environment:
       TZ: "${TZ:-Europe/Madrid}"
-    ports:
-      - "4445:443"
     volumes:
       - ./nginx/ssl:/etc/nginx/ssl
       - nginx-logs:/var/log/nginx
-    networks:
-      - entornexamen-net
     depends_on:
       - web
     restart: unless-stopped
