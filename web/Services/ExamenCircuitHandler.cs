@@ -4,8 +4,8 @@ namespace EntornExamen.Web.Services;
 
 /// <summary>
 /// Detecta quan el navegador de l'alumne perd la connexió SignalR.
-/// Espera 15 s per permetre reconnexions breus. Si no hi ha reconnexió, marca l'alumne
-/// com a desconnectat a l'API sense dependre del CheckinTimeoutService ni del timer de Portal.
+/// Espera 90 s per permetre reconnexions breus (salvapantalles, suspensió breu de WiFi).
+/// Si no hi ha reconnexió, marca l'alumne com a desconnectat a l'API.
 /// </summary>
 public class ExamenCircuitHandler(
     ExamenCircuitState state,
@@ -14,7 +14,7 @@ public class ExamenCircuitHandler(
 {
     private CancellationTokenSource? _cts;
 
-    private const int GracePeriodSeconds = 15;
+    private const int GracePeriodSeconds = 90;
 
     public override Task OnConnectionDownAsync(Circuit circuit, CancellationToken cancellationToken)
     {

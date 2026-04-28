@@ -1,8 +1,7 @@
-# EntornExamen · v2.9.0
+# EntornExamen · v2.9.7
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
-
-**Salesians de Sarrià — Departament d'Informàtica · CFGS ASIX**
+Branding, colors, logo i xarxa DHCP configurables des del `.env`.
 
 ---
 
@@ -23,8 +22,8 @@ Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi 
                 └── entornexamen-redis   (Redis 7 Alpine)
 ```
 
-L'alumne accedeix a **`https://192.168.100.1/examen`** i introdueix el seu correu corporatiu.
-El backend detecta la seva IP des de `HttpContext` i la vincula automàticament al registre DHCP corresponent.
+L'alumne accedeix a **`https://<ip-servidor>:4445/examen`** i introdueix el seu correu corporatiu.
+El backend detecta la seva IP real (nginx en mode host, sense NAT Docker) i la vincula al registre DHCP.
 A partir d'aquí, fa check-in cada 30 s i el professor veu l'estat de tota la classe en temps real.
 
 **Els alumnes no necessiten contrasenya.**
@@ -91,13 +90,20 @@ nano .env
 | `ADMIN_COGNOMS` | | Cognoms de l'administrador |
 | `TZ` | | Zona horària dels contenidors (per defecte: `Europe/Madrid`) |
 | `LOG_LEVEL` | | Nivell de log framework (per defecte: `Warning`). Els logs propis sempre en `Information`. |
-| `EXAMEN_DOMINI_EMAIL` | | Domini acceptat (per defecte: `sarria.salesians.cat`) |
+| `EXAMEN_DOMINI_EMAIL` | | Domini de correu acceptat dels alumnes |
 | `EXAMEN_CHECKIN_INTERVAL_SECONDS` | | Interval check-in en segons (per defecte: `30`) |
 | `EXAMEN_SENSE_CHECKIN_FACTOR` | | Factor ×interval per passar a "Sense check-in" (per defecte: `2`) |
 | `EXAMEN_DESCONNECTAT_FACTOR` | | Factor ×interval per marcar com a desconnectat (per defecte: `4`) |
 | `EXAMEN_MODE_PRO` | | `true` permet IPs duplicades (per a proves locals, per defecte: `false`) |
-| `EXAMEN_DHCP_NETWORK_PREFIX` | | Prefix de la xarxa DHCP (per defecte: `192.168.100.`) |
+| `EXAMEN_DHCP_NETWORK_PREFIX` | | Prefix de la xarxa DHCP dels alumnes (ex: `192.168.100.`) |
 | `SMTP_HOST` | | Servidor SMTP (opcional, per a correu de professors) |
+| `BRAND_NOM` | | Nom de l'aplicació (per defecte: `Entorn d'Examens`) |
+| `BRAND_SHORT_NOM` | | Nom curt per al manifest PWA (per defecte: `Examens`) |
+| `BRAND_ORGANITZACIO` | | Text de l'organització al peu de pàgina |
+| `BRAND_COLOR_PRIMARY` | | Color principal en hex (per defecte: `#CC0000`) |
+| `BRAND_COLOR_APPBAR` | | Color de la barra superior en hex (per defecte: `#1e293b`) |
+| `BRAND_LOGO_URL` | | URL del logo (per defecte: `/images/logo2.png`) |
+| `BRAND_BG_IMAGE_URL` | | URL de la imatge de fons (buit = sense fons) |
 
 ### 3. Configurar el servidor DHCP
 
@@ -310,6 +316,41 @@ dotnet test AutoCo.Tests/
 
 ## Changelog
 
+### v2.9.7 (2026-04-28)
+- **Període de gràcia de desconnexió ampliat a 90 s** — el `ExamenCircuitHandler` ara espera 90 s (era 15 s) abans de marcar l'alumne com a desconnectat, evitant falses desconnexions per salvapantalles o suspensió breu de WiFi. `DisconnectedCircuitRetentionPeriod` actualitzat a 120 s per garantir que el circuit no es destrueixi abans que el handler actuï.
+- README actualitzat a v2.9.x
+
+### v2.9.6 (2026-04-28)
+- Eliminades totes les dependències estàtiques a la xarxa `192.168.100.` del codi i la UI
+- `appsettings.json`: `DhcpNetworkPrefix` buit per defecte (valor ve del `.env`)
+- `Examen.razor`: l'icona i el missatge "IP fora del rang DHCP" usen el prefix configurat dinàmicament
+- `Diagnostic.razor`: fallback sense xarxa hardcoded
+
+### v2.9.5 (2026-04-28)
+- **nginx `network_mode: host`** — elimina el SNAT de Docker que feia que nginx veiés la IP del bridge (172.x.x.x) en lloc de la IP real de l'alumne (192.168.x.x o la que sigui). nginx escolta directament al port 4445 del servidor i veu IPs reals.
+- `web` exposa port `127.0.0.1:8081:8080` al loopback del host perquè nginx hi pugui arribar
+- nginx.conf: `listen 4445 ssl`, `proxy_pass http://127.0.0.1:8081`, eliminat bloc `real_ip` innecessari
+
+### v2.9.4 (2026-04-28)
+- Kestrel força IPv4 pur (`ASPNETCORE_URLS=http://0.0.0.0:8080`) a api i web — elimina adreces `::ffff:` als logs
+- `UseQuerySplittingBehavior(SplitQuery)` global al DbContext — elimina warning EF Core per queries amb múltiples col·leccions incloses (`Registres` + `PeticiosDns`)
+- Fix `InterceptorsNamespaces` al `.csproj` de l'API per al generador OpenAPI de .NET 10
+
+### v2.9.3 (2026-04-28)
+- **Branding completament configurable des del `.env`**: nom, nom curt, organització, color primari, color AppBar, URL del logo, URL del fons
+- `BrandConfig`: servei singleton que llegeix `Brand__*` de la configuració
+- `manifest.json` i `offline.html` generats dinàmicament amb colors i nom de marca
+- `App.razor`: injecta variables CSS (`:root { --primary, --appbar, --bg-image }`) al `<head>`
+- `MainLayout.razor`, `Index.razor`: logo, AppBar, footer i tema MudBlazor via BrandConfig
+- `site.css`: usa `var(--primary)`, `var(--appbar)`, `var(--bg-image)` en lloc de colors hardcoded
+- Volum `./branding:/app/wwwroot/branding:ro` per a logos i imatges de fons personalitzats
+
+### v2.9.2 (2026-04-28)
+- **Enter envia el missatge del professor** al diàleg de missatge (`Shift+Enter` per salt de línia)
+
+### v2.9.1 (2026-04-28)
+- **Fix IP real de l'alumne** — `App.razor` captura `X-Real-IP` de nginx i l'emmagatzema al `ExamenCircuitState`. `ApiClient` afegeix `X-Forwarded-For` amb la IP real a les crides de check-in i sortida cap a l'API, resolent el problema de doble registre per IP de Docker vs IP real.
+
 ### v2.9.0 (2026-04-28)
 - **Fix crític: detecció de tancament de navegador** — el timer de check-in corria al servidor (Blazor Server) fins que el circuit expirava (~3 min), impedint que `CheckinTimeoutService` detectés la desconnexió. Implementat `ExamenCircuitHandler`: en detectar la pèrdua de connexió SignalR, espera 15 s per reconnexions breus i llavors marca l'alumne com a desconnectat a la BD i notifica el professor. Temps total fins a notificació: ~15 s.
 - `DisconnectedCircuitRetentionPeriod = 40 s` — xarxa de seguretat addicional per aturar el timer de Portal.razor
@@ -361,7 +402,7 @@ dotnet test AutoCo.Tests/
 - Fix: thread safety del timer d'auto-refresh (Blazor Server `InvokeAsync`)
 - Fix: comprovació d'una sola estació sempre activa (amb IP de l'altra estació al missatge)
 - Fix: error compilació `ForwardedHeadersOptions` — migrat a `Configure<ForwardedHeadersOptions>()` + `using`
-- Icona d'avís a la graella si la IP de l'alumne no pertany al rang DHCP (192.168.100.x)
+- Icona d'avís a la graella si la IP de l'alumne no pertany al rang DHCP configurat
 - Icona diferenciada a la graella per sortida voluntària vs desconnexió involuntària
 - Pàgina de diagnòstic `/admin/diagnostic`: estat dels fitxers DHCP i DNS, dades de BD, guia de validació
 - Neteja automàtica de sessions tancades fa més de 30 dies (servei en segon pla)

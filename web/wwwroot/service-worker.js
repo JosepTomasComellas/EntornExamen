@@ -5,7 +5,7 @@
 //   3. Mostrar pàgina offline quan no hi ha xarxa
 // IMPORTANT: Actualitzar CACHE_NAME en cada desplegament per forçar neteja de caché vella.
 
-const CACHE_NAME = 'entornexamen-v2.9.6';
+const CACHE_NAME = 'entornexamen-v2.9.7';
 
 const STATIC_ASSETS = [
     '/offline.html',

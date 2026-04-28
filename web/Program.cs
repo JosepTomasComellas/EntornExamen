@@ -25,11 +25,10 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options =>
     {
-        // Temps màxim per reconnectar-se; passat aquest temps el circuit es destrueix
-        // i Dispose() de Portal.razor para el timer de check-in.
-        // El CircuitHandler (15 s) actua abans d'aquest timeout.
+        // Ha de ser > GracePeriodSeconds (90 s) del CircuitHandler perquè el circuit
+        // no es destrueixi abans que el handler pugui cridar SortirCircuitAsync.
         options.DisconnectedCircuitMaxRetained = 100;
-        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromSeconds(40);
+        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromSeconds(120);
     });
 
 builder.Services.AddSignalR()
