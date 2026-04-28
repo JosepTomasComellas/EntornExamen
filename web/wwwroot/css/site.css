@@ -1,10 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   EntornExamen – Salesians de Sarrià · Departament d'Informàtica
+   EntornExamen — valors de marca per defecte (sobreescrits per App.razor)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
     --primary:    #CC0000;
     --primary-dk: #a30000;
+    --appbar:     #1e293b;
+    --appbar-dk:  #192433;
+    --bg-image:   url('/images/fons-salesians.png');
 }
 
 /* ── Utilitats d'ocultació responsiva ────────────────────────────────────── */
@@ -110,7 +113,7 @@ html { scroll-behavior: smooth; }
 
 /* ── Fons de pantalla ────────────────────────────────────────────────────── */
 html, body {
-    background-image: url('/images/fons-salesians.png');
+    background-image: var(--bg-image);
     background-size: cover;
     background-position: center top;
     background-attachment: fixed;
@@ -228,7 +231,7 @@ html, body {
     display: flex;
     align-items: center;
     gap: 1rem;
-    background: #1e293b;
+    background: var(--appbar, #1e293b);
     color: white;
     padding: 1rem 1.5rem;
     border-radius: 10px 10px 0 0;
@@ -289,8 +292,8 @@ html, body {
 
 .barra-wrap { position: relative; height: 14px; background: #f1f5f9; border-radius: 7px; overflow: hidden }
 .barra { position: absolute; top: 0; left: 0; height: 100%; border-radius: 7px }
-.barra.auto { background: #CC0000; z-index: 2 }
-.barra.co   { background: #1e293b; z-index: 1 }
+.barra.auto { background: var(--primary);          z-index: 2 }
+.barra.co   { background: var(--appbar, #1e293b);  z-index: 1 }
 
 .informe-comentari {
     background: #f8fafc;
@@ -300,7 +303,7 @@ html, body {
     font-style: italic;
     color: #475569;
 }
-.informe-nota-prof { border-left-color: #CC0000 }
+.informe-nota-prof { border-left-color: var(--primary) }
 
 .informe-peu {
     text-align: center;

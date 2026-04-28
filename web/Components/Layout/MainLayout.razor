@@ -5,6 +5,7 @@
 @inject ProtectedLocalStorage LocalStorage
 @inject IJSRuntime JS
 @inject IStringLocalizer<SharedResources> Loc
+@inject BrandConfig Brand
 
 <MudThemeProvider Theme="_theme" IsDarkMode="@_darkMode" />
 <MudPopoverProvider />
@@ -12,11 +13,11 @@
 <MudSnackbarProvider />
 
 <MudLayout Class="@(_darkMode ? "app-dark" : "app-light")">
-    <MudAppBar Elevation="3" Style="background:#1e293b">
+    <MudAppBar Elevation="3" Style="@($"background:{Brand.ColorAppBar}")">
         <!-- Logo clicable → dashboard del rol actiu -->
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0" Style="min-width:0;flex-shrink:0">
             <a href="@LogoHref" style="display:block;line-height:0">
-                <MudImage Src="/images/logo2.png" Height="44" Style="display:block" />
+                <MudImage Src="@Brand.LogoUrl" Height="44" Style="display:block" />
             </a>
         </MudStack>
 
@@ -107,12 +108,12 @@
     </MudMainContent>
 
     <!-- Footer fosc, igual que la capçalera -->
-    <MudAppBar Bottom="true" Elevation="0" Dense="true" Style="background:#1e293b">
+    <MudAppBar Bottom="true" Elevation="0" Dense="true" Style="@($"background:{Brand.ColorAppBar}")">
         <MudSpacer />
         <MudText Typo="Typo.caption" Style="color:rgba(255,255,255,.6)">
-            <strong style="color:rgba(255,255,255,.85)">Salesians de Sarrià</strong>
-            &nbsp;·&nbsp; Dept. d'Informàtica &nbsp;|&nbsp;
-            Entorn d'Examens © @DateTime.Now.Year
+            <strong style="color:rgba(255,255,255,.85)">@Brand.Organitzacio</strong>
+            &nbsp;|&nbsp;
+            @Brand.Nom © @DateTime.Now.Year
             &nbsp;·&nbsp;
             <span style="color:rgba(255,255,255,.45);font-size:.7rem">v@(AppVersion.Current)</span>
         </MudText>
@@ -123,17 +124,9 @@
 @code {
     private bool   _sessionChecked = false;
     private bool   _darkMode       = false;
-    private string _primaryColor   = "#CC0000";
+    private string _primaryColor   = "#CC0000"; // sobreescrit a OnInitialized
 
-    private static readonly (string Name, string Hex)[] _colorOptions =
-    [
-        ("Vermell (per defecte)", "#CC0000"),
-        ("Blau",                  "#1d4ed8"),
-        ("Verd",                  "#15803d"),
-        ("Taronja",               "#ea580c"),
-        ("Violeta",               "#7c3aed"),
-        ("Gris",                  "#475569"),
-    ];
+    private (string Name, string Hex)[] _colorOptions = []; // inicialitzat a OnInitialized
 
     private string LogoHref => UserState.IsStudent   ? "/alumne/dashboard"
                              : UserState.IsProfessor ? "/professor/dashboard"
@@ -141,6 +134,17 @@
 
     protected override void OnInitialized()
     {
+        _primaryColor = Brand.ColorPrimary;
+        _colorOptions =
+        [
+            ("Per defecte",  Brand.ColorPrimary),
+            ("Blau",         "#1d4ed8"),
+            ("Verd",         "#15803d"),
+            ("Taronja",      "#ea580c"),
+            ("Violeta",      "#7c3aed"),
+            ("Gris",         "#475569"),
+        ];
+        _theme = BuildTheme(Brand.ColorPrimary, Brand.ColorAppBar);
         UserState.OnSessionExpired += HandleSessionExpired;
     }
 
@@ -176,38 +180,45 @@
         catch { return true; }
     }
 
-    private MudTheme _theme = new MudTheme()
+    private MudTheme _theme = new(); // sobreescrit a OnInitialized via BuildTheme
+
+    private static MudTheme BuildTheme(string primary, string appbar)
     {
-        PaletteLight = new PaletteLight
+        var primaryDark = DarkenHex(primary, 0.15);
+        var appbarDark  = DarkenHex(appbar,  0.15);
+        return new MudTheme
         {
-            Primary         = "#CC0000",
-            PrimaryDarken   = "#a30000",
-            Secondary       = "#1e293b",
-            SecondaryDarken = "#0f172a",
-            AppbarBackground  = "#1e293b",
-            Background      = "#e2e8f0",
-            Surface         = "#ffffff",
-            DrawerBackground  = "#1e293b",
-        },
-        PaletteDark = new PaletteDark
-        {
-            Primary         = "#e53535",
-            PrimaryDarken   = "#CC0000",
-            Secondary       = "#94a3b8",
-            SecondaryDarken = "#64748b",
-            AppbarBackground  = "#0f172a",
-            Background      = "#020617",
-            BackgroundGray  = "#0f172a",
-            Surface         = "#1e293b",
-            DrawerBackground  = "#0f172a",
-            TextPrimary     = "#f1f5f9",
-            TextSecondary   = "#94a3b8",
-            ActionDefault   = "#94a3b8",
-            LinesDefault    = "rgba(255,255,255,0.08)",
-            TableLines      = "rgba(255,255,255,0.08)",
-            Divider         = "rgba(255,255,255,0.08)",
-        }
-    };
+            PaletteLight = new PaletteLight
+            {
+                Primary          = primary,
+                PrimaryDarken    = primaryDark,
+                Secondary        = appbar,
+                SecondaryDarken  = appbarDark,
+                AppbarBackground = appbar,
+                Background       = "#e2e8f0",
+                Surface          = "#ffffff",
+                DrawerBackground = appbar,
+            },
+            PaletteDark = new PaletteDark
+            {
+                Primary          = primary,
+                PrimaryDarken    = primaryDark,
+                Secondary        = "#94a3b8",
+                SecondaryDarken  = "#64748b",
+                AppbarBackground = appbarDark,
+                Background       = "#020617",
+                BackgroundGray   = "#0f172a",
+                Surface          = "#1e293b",
+                DrawerBackground = appbarDark,
+                TextPrimary      = "#f1f5f9",
+                TextSecondary    = "#94a3b8",
+                ActionDefault    = "#94a3b8",
+                LinesDefault     = "rgba(255,255,255,0.08)",
+                TableLines       = "rgba(255,255,255,0.08)",
+                Divider          = "rgba(255,255,255,0.08)",
+            }
+        };
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -264,12 +275,7 @@
 
     private void ApplyColor(string hex)
     {
-        // Calculem un color més fosc per al Darken
-        var darker = DarkenHex(hex, 0.15);
-        _theme.PaletteLight.Primary       = hex;
-        _theme.PaletteLight.PrimaryDarken = darker;
-        _theme.PaletteDark.Primary        = hex;
-        _theme.PaletteDark.PrimaryDarken  = darker;
+        _theme = BuildTheme(hex, Brand.ColorAppBar);
     }
 
     private static string DarkenHex(string hex, double amount)

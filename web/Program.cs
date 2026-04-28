@@ -62,6 +62,9 @@ builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new System.IO.DirectoryInfo("/app/dp-keys"))
     .SetApplicationName("EntornExamen");
 
+// Configuració de marca (logo, colors, nom del centre)
+builder.Services.AddSingleton<BrandConfig>();
+
 // Estat de l'usuari (substitueix ISession + SessionHelper)
 builder.Services.AddScoped<UserStateService>();
 
@@ -94,6 +97,13 @@ if (!app.Environment.IsDevelopment())
 app.UseStaticFiles();
 app.UseRequestLocalization();
 app.UseAntiforgery();
+
+// manifest.json i offline.html es generen dinàmicament per reflectir la marca configurada
+app.MapGet("/manifest.json", (BrandConfig brand) =>
+    Results.Content(brand.GenerateManifestJson(), "application/manifest+json; charset=utf-8"));
+
+app.MapGet("/offline.html", (BrandConfig brand) =>
+    Results.Content(brand.GenerateOfflineHtml(), "text/html; charset=utf-8"));
 
 app.MapRazorComponents<EntornExamen.Web.Components.App>()
     .AddInteractiveServerRenderMode();

@@ -124,9 +124,17 @@ services:
       ApiSettings__BaseUrl:    "http://api:8080"
       Redis__ConnectionString: "redis:6379"
       Examen__DhcpNetworkPrefix: "${EXAMEN_DHCP_NETWORK_PREFIX:-192.168.100.}"
+      Brand__Nom:          "${BRAND_NOM:-Entorn d'Examens}"
+      Brand__ShortNom:     "${BRAND_SHORT_NOM:-Examens}"
+      Brand__Organitzacio: "${BRAND_ORGANITZACIO:-Salesians de Sarrià · Dept. d'Informàtica}"
+      Brand__ColorPrimary: "${BRAND_COLOR_PRIMARY:-#CC0000}"
+      Brand__ColorAppBar:  "${BRAND_COLOR_APPBAR:-#1e293b}"
+      Brand__LogoUrl:      "${BRAND_LOGO_URL:-/images/logo2.png}"
+      Brand__BgImageUrl:   "${BRAND_BG_IMAGE_URL:-/images/fons-salesians.png}"
     volumes:
       - dp-keys:/app/dp-keys
       - fotos-alumnes:/app/wwwroot/fotos/alumnes
+      - ./branding:/app/wwwroot/branding:ro
     networks:
       - entornexamen-net
     depends_on:

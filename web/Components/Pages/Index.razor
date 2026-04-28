@@ -2,8 +2,9 @@
 @inject UserStateService UserState
 @inject NavigationManager Nav
 @inject IStringLocalizer<SharedResources> Loc
+@inject BrandConfig Brand
 
-<PageTitle>Entorn d'Examens</PageTitle>
+<PageTitle>@Brand.Nom</PageTitle>
 
 @if (UserState.IsLoggedIn)
 {
@@ -18,8 +19,8 @@
         <MudPaper Elevation="6" Style="overflow:hidden;border-radius:16px">
 
             <!-- Capçalera fosca amb logo -->
-            <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);padding:2.5rem 2rem;text-align:center">
-                <MudImage Src="/images/logo2.png" Height="56"
+            <div style="@($"background:linear-gradient(135deg,{Brand.ColorAppBar} 0%,{Brand.ColorAppBarDark} 100%);padding:2.5rem 2rem;text-align:center")">
+                <MudImage Src="@Brand.LogoUrl" Height="56"
                           Style="display:inline-block;margin-bottom:.75rem;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))" />
                 <MudText Typo="Typo.h6" Style="color:white;font-weight:700;margin-bottom:.25rem">
                     @Loc["Home_Title"]
