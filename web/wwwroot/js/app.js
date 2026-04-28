@@ -36,6 +36,11 @@ window.downloadBase64File = function (base64, fileName, mimeType) {
 // Alias per compatibilitat amb el plafó d'examen
 window.downloadFileFromBase64 = window.downloadBase64File;
 
+// ── Entorn Examen: IP del client injectada pel servidor ──────────────────────
+// App.razor escriu window.__entornClientIp durant el render HTTP inicial.
+// Portal.razor el llegeix via JS interop un cop establert el circuit Blazor.
+window.getClientIp = function () { return window.__entornClientIp || ''; };
+
 // ── Entorn Examen: so de desconnexió (Web Audio API, sense fitxers externs) ───
 window.examenSoDesconnexio = function () {
     try {

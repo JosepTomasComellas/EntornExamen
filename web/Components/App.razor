@@ -32,6 +32,7 @@
     <script src="/js/app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script src="/js/charts.js"></script>
+    <script>window.__entornClientIp='@_clientIp';</script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/service-worker.js');
@@ -48,11 +49,16 @@
     [Inject] private EntornExamen.Web.Services.BrandConfig       Brand        { get; set; } = default!;
     [Inject] private EntornExamen.Web.Services.ExamenCircuitState CircuitState { get; set; } = default!;
 
+    // Emmagatzemat aquí per injectar-lo com a variable JS (window.__entornClientIp).
+    // El circuit Blazor crea un DI scope diferent del de la petició HTTP, de manera que
+    // CircuitState.ClientIp escrit aquí no és llegit per Portal.razor. La variable JS
+    // és l'únic canal que travessa el boundary entre els dos scopes.
+    private string _clientIp = "";
+
     protected override void OnInitialized()
     {
         if (HttpContext is not null)
         {
-            // Cultura: propagada als threads del circuit Blazor Server
             var feature = HttpContext.Features.Get<IRequestCultureFeature>();
             if (feature is not null)
             {
@@ -60,9 +66,6 @@
                 CultureInfo.DefaultThreadCurrentUICulture = feature.RequestCulture.UICulture;
             }
 
-            // IP real del client: nginx envia X-Real-IP amb la IP original ja resolta
-            // (després que el mòdul real_ip hagi processat X-Forwarded-For).
-            // Guardem-la al circuit perquè ApiClient la reenvïi cap a l'API.
             var ip = HttpContext.Request.Headers["X-Real-IP"].FirstOrDefault()
                   ?? HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()
                          ?.Split(',')[0].Trim()
@@ -72,7 +75,7 @@
             if (System.Net.IPAddress.TryParse(ip, out var addr) && addr.IsIPv4MappedToIPv6)
                 ip = addr.MapToIPv4().ToString();
 
-            CircuitState.ClientIp = ip;
+            _clientIp = ip;
         }
     }
 }

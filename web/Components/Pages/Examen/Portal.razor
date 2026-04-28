@@ -4,9 +4,12 @@
 @inject ExamenNotificationService ExamenNotif
 @inject IStringLocalizer<SharedResources> Loc
 @inject ExamenCircuitState CircuitState
+@inject IJSRuntime JS
+@inject IConfiguration Config
+@inject EntornExamen.Web.Services.BrandConfig Brand
 @implements IDisposable
 
-<PageTitle>@Loc["ExamenPortal_Title"] — Salesians de Sarrià</PageTitle>
+<PageTitle>@Loc["ExamenPortal_Title"] — @Brand.Nom</PageTitle>
 
 @if (_fase == Fase.Email)
 {
@@ -14,7 +17,7 @@
         <MudContainer MaxWidth="MaxWidth.ExtraSmall">
             <MudPaper Elevation="4" Style="overflow:hidden;border-radius:12px">
 
-                <div style="background:#1e293b;padding:1.5rem 2rem;display:flex;align-items:center;gap:1rem">
+                <div style="background:var(--appbar,#1e293b);padding:1.5rem 2rem;display:flex;align-items:center;gap:1rem">
                     <MudIcon Icon="@Icons.Material.Filled.MenuBook"
                              Style="color:rgba(255,255,255,.9);font-size:2rem;flex-shrink:0" />
                     <MudStack Spacing="0">
@@ -32,15 +35,6 @@
                     {
                         <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true">@_errorEmail</MudAlert>
                     }
-                    @if (_suggeriment is not null)
-                    {
-                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4"
-                                  OnClick="@(async () => { _email = _suggeriment!; _suggeriment = null; await ValidarEmail(); })"
-                                  Style="cursor:pointer">
-                            @Loc["ExamenPortal_SuggestEmail", _suggeriment]
-                        </MudAlert>
-                    }
-
                     <MudTextField @bind-Value="_email"
                                   Label="@Loc["ExamenPortal_EmailLabel"]"
                                   InputType="InputType.Email"
@@ -81,7 +75,7 @@
             <MudPaper Elevation="4" Style="overflow:hidden;border-radius:12px">
 
                 <!-- Capçalera amb foto/avatar i nom -->
-                <div style="background:#1e293b;padding:1.5rem 2rem;display:flex;align-items:center;gap:1rem">
+                <div style="background:var(--appbar,#1e293b);padding:1.5rem 2rem;display:flex;align-items:center;gap:1rem">
                     @if (_checkinResp.Alumne.FotoUrl is not null)
                     {
                         <MudAvatar Style="width:56px;height:56px;flex-shrink:0">
@@ -136,7 +130,16 @@
                     <MudProgressLinear
                         Value="@(CheckinInterval > 0 ? (100 - _segonsRestants * 100 / CheckinInterval) : 0)"
                         Color="Color.Success" Rounded="true" Size="Size.Small"
-                        Class="mb-4" />
+                        Class="mb-3" />
+
+                    <MudStack Row="true" Spacing="4" Class="mb-4" Style="opacity:.6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            IP: @(string.IsNullOrWhiteSpace(CircuitState.ClientIp) ? "—" : CircuitState.ClientIp)
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Sessió #@_checkinResp.Sessio.SessioId
+                        </MudText>
+                    </MudStack>
 
                     <MudButton Variant="Variant.Outlined" Color="Color.Error" FullWidth="true"
                                Size="Size.Small"
@@ -223,10 +226,10 @@
     private int CheckinInterval => _checkinResp?.Sessio.IntervalSegons ?? 30;
 
     private Fase    _fase = Fase.Email;
-    private string  _email      = "";
-    private string? _suggeriment;
+    private string  _email       = "";
     private string? _errorEmail;
     private bool    _carregant;
+    private string  _dominiEmail = "sarria.salesians.cat";
 
     private CheckinResponse? _checkinResp;
     private DateTime _ultimCheckin;
@@ -240,6 +243,22 @@
 
     private Func<string, object, Task>? _alumneHandler;
 
+    protected override void OnInitialized()
+    {
+        _dominiEmail = Config["Examen:DominiEmail"] ?? "sarria.salesians.cat";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        // Llegeix la IP injectada pel servidor a App.razor via window.__entornClientIp.
+        // Necessari perquè App.razor corre en scope HTTP (DI instance A) i Portal.razor
+        // en scope de circuit (DI instance B); la variable JS és l'únic canal entre ambdós.
+        var ip = await JS.InvokeAsync<string>("getClientIp");
+        if (!string.IsNullOrWhiteSpace(ip))
+            CircuitState.ClientIp = ip;
+    }
+
     private async Task OnEmailKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter") await ValidarEmail();
@@ -247,18 +266,13 @@
 
     private async Task ValidarEmail()
     {
-        _errorEmail  = null;
-        _suggeriment = null;
+        _errorEmail = null;
 
         var email = _email.Trim().ToLower();
-
         if (!email.Contains('@'))
-        {
-            _suggeriment = $"{email}@sarria.salesians.cat";
-            StateHasChanged();
-            return;
-        }
+            email = $"{email}@{_dominiEmail}";
 
+        _email = email;
         await FerCheckin();
     }
 

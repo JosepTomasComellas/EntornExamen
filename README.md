@@ -1,4 +1,4 @@
-# EntornExamen · v2.9.7
+# EntornExamen · v2.9.9
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 Branding, colors, logo i xarxa DHCP configurables des del `.env`.
@@ -42,9 +42,10 @@ A partir d'aquí, fa check-in cada 30 s i el professor veu l'estat de tota la cl
 - Mode presentació (pantalla completa)
 
 ### Alumne (`/examen`)
-- Identificació per correu corporatiu `@sarria.salesians.cat` (sense contrasenya)
+- Identificació per correu corporatiu (sense contrasenya). Si s'introdueix l'usuari sense domini, s'auto-completa amb el domini configurat (`EXAMEN_DOMINI_EMAIL`, per defecte `sarria.salesians.cat`)
 - Check-in automàtic cada 30 s
 - Rebuda de missatges del professor (diàleg emergent obligatori)
+- Mostra IP real i ID de sessió a la pantalla de seguiment
 
 ### Admin
 - Gestió de professors, classes i alumnes
@@ -315,6 +316,16 @@ dotnet test AutoCo.Tests/
 ---
 
 ## Changelog
+
+### v2.9.9 (2026-04-28)
+- **Branding complet a Portal.razor**: les capçaleres de les targetes (`Fase.Email` i `Fase.Connectat`) usen `var(--appbar)` en lloc del color `#1e293b` hardcoded
+
+### v2.9.8 (2026-04-28)
+- **Fix IP real de l'alumne (DI scope)**: `App.razor` escriu la IP real en `window.__entornClientIp` durant el render HTTP inicial; `Portal.razor` la llegeix via JS interop a `OnAfterRenderAsync(firstRender)` i la desa a `CircuitState.ClientIp` del circuit actiu. Necessari perquè el circuit Blazor crea un DI scope diferent del de la petició HTTP — el camp `CircuitState.ClientIp` escrit a App.razor (scope HTTP) no és el mateix que llegeix Portal.razor (scope circuit).
+- **Login alumne sense domini auto-completat**: si l'alumne introdueix `usuari` sense `@domini`, es completa automàticament amb el domini configurat (`EXAMEN_DOMINI_EMAIL`) i es fa el check-in directament, sense pas intermedi de suggeriment
+- **IP i sessió a la pantalla de l'alumne**: la fase `Connectat` de Portal.razor mostra la IP real del dispositiu i l'ID de sessió sota la barra de progrés del check-in
+- `PageTitle` de Portal.razor ara usa `@Brand.Nom` (era `Salesians de Sarrià` hardcoded)
+- `appsettings.json`: afegit `Examen:DominiEmail` amb el valor per defecte `sarria.salesians.cat`
 
 ### v2.9.7 (2026-04-28)
 - **Període de gràcia de desconnexió ampliat a 90 s** — el `ExamenCircuitHandler` ara espera 90 s (era 15 s) abans de marcar l'alumne com a desconnectat, evitant falses desconnexions per salvapantalles o suspensió breu de WiFi. `DisconnectedCircuitRetentionPeriod` actualitzat a 120 s per garantir que el circuit no es destrueixi abans que el handler actuï.
