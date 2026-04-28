@@ -1,4 +1,4 @@
-# EntornExamen · v2.9.9
+# EntornExamen · v3.0.0
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 Branding, colors, logo i xarxa DHCP configurables des del `.env`.
@@ -316,6 +316,12 @@ dotnet test AutoCo.Tests/
 ---
 
 ## Changelog
+
+### v3.0.0 (2026-04-28)
+- **Nou estat `Expulsat`** — l'alumne expulsat pel professor queda en un estat permanent (porpra) que impedeix que el check-in automàtic el torni a connectar. Fins ara, el timer de Portal.razor enviava un nou check-in pocs segons després de l'expulsió i el registre es reactivava a la BD.
+- `EstatConnexio.Expulsat` (API) i `EstatConnexioDto.Expulsat` (web) — valor 4 (compatible amb BD existent sense canvi de schema)
+- Totes les queries que excloïen `Desconnectat` ara també exclouen `Expulsat`: check-in, sortida voluntària, sortida per circuit, DHCP connected/disconnected, DNS
+- Plafó professor: color porpra `#7c3aed`, text "Expulsat/Expulsado", filtre per estat, botó "Expulsar" ocult per a alumnes ja expulsats
 
 ### v2.9.9 (2026-04-28)
 - **Branding complet a Portal.razor**: les capçaleres de les targetes (`Fase.Email` i `Fase.Connectat`) usen `var(--appbar)` en lloc del color `#1e293b` hardcoded

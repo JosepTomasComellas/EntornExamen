@@ -91,7 +91,7 @@ public record MonthlyStatDto(int Year, int Month, int Count);
 
 public enum EstatConnexioDto
 {
-    Connectat, SenseCheckin, Desconnectat, NoConnectat
+    Connectat, SenseCheckin, Desconnectat, NoConnectat, Expulsat
 }
 
 // ─── Sessions d'examen ───────────────────────────────────────────────────────

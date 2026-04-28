@@ -336,7 +336,8 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 .FirstOrDefaultAsync(r => r.SessioId == sessio.Id &&
                     r.StudentId == student.Id &&
                     r.IpAssignada != clientIp &&
-                    r.Estat != EstatConnexio.Desconnectat);
+                    r.Estat != EstatConnexio.Desconnectat &&
+                    r.Estat != EstatConnexio.Expulsat);
             if (altreRegistre is not null)
                 return (null, $"Ja estàs connectat des d'una altra estació ({altreRegistre.IpAssignada}).");
         }
@@ -350,6 +351,9 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         string mac = "";
         if (registre is not null)
         {
+            if (registre.Estat == EstatConnexio.Expulsat)
+                return (null, "Has estat expulsat de la sessió d'examen pel professor.");
+
             // Identifica l'alumne en el registre existent
             registre.StudentId      = student.Id;
             registre.UltimCheckinAt = ara;
@@ -416,6 +420,7 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         {
             if (registre is not null)
             {
+                if (registre.Estat == EstatConnexio.Expulsat) return;
                 registre.IpAssignada = req.Ip;
                 registre.Estat       = EstatConnexio.Connectat;
                 await db.SaveChangesAsync();
@@ -446,7 +451,8 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 }
             }
         }
-        else if (req.Event == "disconnected" && registre is not null)
+        else if (req.Event == "disconnected" && registre is not null &&
+                 registre.Estat != EstatConnexio.Expulsat)
         {
             registre.Estat          = EstatConnexio.Desconnectat;
             registre.DesconnectatAt = ara;
@@ -465,7 +471,8 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         var registre = await db.RegistresConnexio
             .Include(r => r.Student)
             .FirstOrDefaultAsync(r => r.IpAssignada == req.Ip &&
-                r.Estat != EstatConnexio.Desconnectat);
+                r.Estat != EstatConnexio.Desconnectat &&
+                r.Estat != EstatConnexio.Expulsat);
         if (registre is null) return;
 
         var esExterna = !req.Domini.EndsWith(".examen.local",
@@ -515,7 +522,8 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         var registre = await db.RegistresConnexio
             .Include(r => r.Student)
             .FirstOrDefaultAsync(r => r.IpAssignada == clientIp &&
-                r.Estat != EstatConnexio.Desconnectat);
+                r.Estat != EstatConnexio.Desconnectat &&
+                r.Estat != EstatConnexio.Expulsat);
 
         if (registre is null)
             return (false, "No s'ha trobat cap connexió activa per a aquesta IP.");
@@ -539,6 +547,7 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             .Include(r => r.Sessio)
             .FirstOrDefaultAsync(r => r.StudentId == studentId &&
                 r.Estat != EstatConnexio.Desconnectat &&
+                r.Estat != EstatConnexio.Expulsat &&
                 r.Sessio.Activa);
 
         if (registre is null)
@@ -569,10 +578,11 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             .Include(r => r.Student)
             .FirstOrDefaultAsync(r => r.SessioId == sessioId &&
                 r.StudentId == studentId &&
-                r.Estat != EstatConnexio.Desconnectat);
+                r.Estat != EstatConnexio.Desconnectat &&
+                r.Estat != EstatConnexio.Expulsat);
         if (registre is null) return (false, "L'alumne no està connectat.");
 
-        registre.Estat          = EstatConnexio.Desconnectat;
+        registre.Estat          = EstatConnexio.Expulsat;
         registre.DesconnectatAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
 

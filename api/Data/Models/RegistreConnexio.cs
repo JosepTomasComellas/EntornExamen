@@ -5,7 +5,8 @@ public enum EstatConnexio
     Connectat,       // Verd: connectat + check-in < 30s
     SenseCheckin,    // Groc: connectat però check-in > 30s
     Desconnectat,    // Vermell: desconnectat del WiFi
-    NoConnectat      // Gris: alumne precarregat però mai connectat
+    NoConnectat,     // Gris: alumne precarregat però mai connectat
+    Expulsat         // Porpra: expulsat explícitament pel professor; no pot re-connectar
 }
 
 public class RegistreConnexio

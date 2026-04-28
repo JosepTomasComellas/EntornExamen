@@ -196,6 +196,9 @@
                 <MudSelectItem T="EstatConnexioDto?" Value="@((EstatConnexioDto?)EstatConnexioDto.NoConnectat)">
                     @Loc["Examen_Status_NoConnectat"]
                 </MudSelectItem>
+                <MudSelectItem T="EstatConnexioDto?" Value="@((EstatConnexioDto?)EstatConnexioDto.Expulsat)">
+                    @Loc["Examen_Status_Expulsat"]
+                </MudSelectItem>
             </MudSelect>
         </MudItem>
         <MudItem xs="12" sm="12" md="4" Class="d-flex align-center">
@@ -520,7 +523,8 @@
 
                     <!-- Acció d'expulsió -->
                     @if (_sessio?.Activa == true && _alumneSeleccionat.StudentId.HasValue &&
-                         _alumneSeleccionat.Estat != EstatConnexioDto.Desconnectat)
+                         _alumneSeleccionat.Estat != EstatConnexioDto.Desconnectat &&
+                         _alumneSeleccionat.Estat != EstatConnexioDto.Expulsat)
                     {
                         <MudDivider />
                         <MudButton Variant="Variant.Outlined" Color="Color.Error" FullWidth="true"
@@ -1055,6 +1059,7 @@
         EstatConnexioDto.Connectat    => "#22c55e",
         EstatConnexioDto.SenseCheckin => "#f59e0b",
         EstatConnexioDto.Desconnectat => "#ef4444",
+        EstatConnexioDto.Expulsat     => "#7c3aed",
         _                            => "#9ca3af"
     };
 
@@ -1063,6 +1068,7 @@
         EstatConnexioDto.Connectat    => Loc["Examen_Status_Connectat"].Value,
         EstatConnexioDto.SenseCheckin => Loc["Examen_Status_SenseCheckin"].Value,
         EstatConnexioDto.Desconnectat => Loc["Examen_Status_Desconnectat"].Value,
+        EstatConnexioDto.Expulsat     => Loc["Examen_Status_Expulsat"].Value,
         _                            => Loc["Examen_Status_NoConnectat"].Value
     };
 
