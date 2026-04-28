@@ -18,6 +18,12 @@ public class CheckinTimeoutService(
     private int IntervalSegons =>
         int.TryParse(config["Examen:CheckinIntervalSeconds"], out var iv) ? iv : 30;
 
+    private int SenseCheckinFactor =>
+        int.TryParse(config["Examen:SenseCheckinFactor"], out var f) && f > 0 ? f : 2;
+
+    private int DesconnectatFactor =>
+        int.TryParse(config["Examen:DesconnectatFactor"], out var f) && f > 0 ? f : 4;
+
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         logger.LogInformation("CheckinTimeoutService iniciat.");
@@ -33,7 +39,9 @@ public class CheckinTimeoutService(
 
     private async Task ProcessarTimeoutsAsync()
     {
-        var interval = IntervalSegons;
+        var interval          = IntervalSegons;
+        var senseCheckinFactor = SenseCheckinFactor;
+        var desconnectatFactor = DesconnectatFactor;
         var ara = DateTime.UtcNow;
 
         using var scope = services.CreateScope();
@@ -46,8 +54,8 @@ public class CheckinTimeoutService(
             .ToListAsync();
         if (sessionsActives.Count == 0) return;
 
-        // Connectats sense check-in en interval×2 → SenseCheckin
-        var threshold1 = ara.AddSeconds(-interval * 2);
+        // Connectats sense check-in en interval×SenseCheckinFactor → SenseCheckin
+        var threshold1 = ara.AddSeconds(-interval * senseCheckinFactor);
         var sensCheckin = await db.RegistresConnexio
             .Where(r => sessionsActives.Contains(r.SessioId) &&
                         r.Estat == EstatConnexio.Connectat &&
@@ -56,8 +64,8 @@ public class CheckinTimeoutService(
         foreach (var r in sensCheckin)
             r.Estat = EstatConnexio.SenseCheckin;
 
-        // SenseCheckin durant interval×4 → Desconnectat + notificació
-        var threshold2 = ara.AddSeconds(-interval * 4);
+        // SenseCheckin durant interval×DesconnectatFactor → Desconnectat + notificació
+        var threshold2 = ara.AddSeconds(-interval * desconnectatFactor);
         var desconnectats = await db.RegistresConnexio
             .Include(r => r.Student)
             .Where(r => sessionsActives.Contains(r.SessioId) &&

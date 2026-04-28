@@ -7,6 +7,7 @@
 @inject IJSRuntime JS
 @inject IStringLocalizer<SharedResources> Loc
 @inject IConfiguration Config
+@inject ISnackbar Snackbar
 @implements IDisposable
 
 <PageTitle>@Loc["Examen_Title"] – Entorn d'Examens</PageTitle>
@@ -838,19 +839,27 @@
                 break;
             }
             case "AlumneDesconnectat" when data is ExamenEventAlumne evt:
+            {
+                var nom = $"{evt.Nom} {evt.Cognoms}".Trim();
                 ActualitzarAlumne(evt.Mac, a => a with { Estat = EstatConnexioDto.Desconnectat });
-                AfegirAlerta($"Desconnectat: {evt.Nom} {evt.Cognoms}",
-                    Icons.Material.Filled.LinkOff, Color.Error,
-                    $"{evt.Nom} {evt.Cognoms}".Trim());
+                AfegirAlerta($"Desconnectat: {nom}",
+                    Icons.Material.Filled.LinkOff, Color.Error, nom);
+                Snackbar.Add($"Desconnectat: {nom}", Severity.Error,
+                    cfg => { cfg.DuplicatesBehavior = SnackbarDuplicatesBehavior.Allow; cfg.VisibleStateDuration = 6000; });
                 await JS.InvokeVoidAsync("examenSoDesconnexio");
                 break;
+            }
             case "AlumneDesconnectatVoluntari" when data is ExamenEventAlumne evt:
+            {
+                var nom = $"{evt.Nom} {evt.Cognoms}".Trim();
                 _sortideVoluntaries.Add(evt.Mac);
                 ActualitzarAlumne(evt.Mac, a => a with { Estat = EstatConnexioDto.Desconnectat });
-                AfegirAlerta($"Ha sortit voluntàriament: {evt.Nom} {evt.Cognoms}",
-                    Icons.Material.Filled.ExitToApp, Color.Warning,
-                    $"{evt.Nom} {evt.Cognoms}".Trim());
+                AfegirAlerta($"Ha sortit voluntàriament: {nom}",
+                    Icons.Material.Filled.ExitToApp, Color.Warning, nom);
+                Snackbar.Add($"Sortida voluntària: {nom}", Severity.Warning,
+                    cfg => { cfg.DuplicatesBehavior = SnackbarDuplicatesBehavior.Allow; cfg.VisibleStateDuration = 6000; });
                 break;
+            }
             case "NouCheckin" when data is ExamenEventAlumne evt:
             {
                 var trobat = ActualitzarAlumne(evt.Mac, a => a with
