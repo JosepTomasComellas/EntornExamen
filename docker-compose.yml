@@ -107,6 +107,7 @@ services:
       ASPNETCORE_ENVIRONMENT:  Production
       ApiSettings__BaseUrl:    "http://api:8080"
       Redis__ConnectionString: "redis:6379"
+      Examen__DhcpNetworkPrefix: "${EXAMEN_DHCP_NETWORK_PREFIX:-192.168.100.}"
     volumes:
       - dp-keys:/app/dp-keys
       - fotos-alumnes:/app/wwwroot/fotos/alumnes

@@ -345,17 +345,21 @@
             }
             else
             {
-                <MudList T="string" Dense="true">
+                <div style="max-height:220px;overflow-y:auto;border:1px solid var(--mud-palette-lines-default);border-radius:4px">
                     @foreach (var entrada in historicFiltrat)
                     {
-                        <MudListItem Icon="@entrada.Icona" IconColor="entrada.Color">
-                            <MudText Typo="Typo.caption">
-                                <strong>@entrada.Hora.ToLocalTime().ToString("HH:mm:ss")</strong>
-                                — @entrada.Text
-                            </MudText>
-                        </MudListItem>
+                        <div style="display:flex;align-items:center;gap:5px;padding:2px 6px;border-bottom:1px solid var(--mud-palette-lines-default)">
+                            <MudIcon Icon="@entrada.Icona" Color="entrada.Color"
+                                     Style="font-size:.9rem;flex-shrink:0" />
+                            <span style="font-family:monospace;font-size:.7rem;color:var(--mud-palette-text-secondary);flex-shrink:0;min-width:50px">
+                                @entrada.Hora.ToLocalTime().ToString("HH:mm:ss")
+                            </span>
+                            <span style="font-size:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                                @entrada.Text
+                            </span>
+                        </div>
                     }
-                </MudList>
+                </div>
             }
         </MudPaper>
 

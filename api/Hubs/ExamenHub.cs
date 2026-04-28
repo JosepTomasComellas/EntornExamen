@@ -46,7 +46,7 @@ public class ExamenHub(IConnectionMultiplexer redis)
         PublicarAsync(CanalAlumne(studentId), "MissatgeProfessor", evt);
 
     public Task NotificaSessioTancadaAsync(int studentId) =>
-        PublicarAsync(CanalAlumne(studentId), "SessioTancada", new { });
+        PublicarAsync(CanalAlumne(studentId), "SessioTancadaGlobal", new { });
 
     public Task NotificaAlumneExpulsatAsync(int studentId) =>
         PublicarAsync(CanalAlumne(studentId), "AlumneExpulsat", new { });

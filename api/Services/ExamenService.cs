@@ -176,7 +176,14 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         sessio.Activa     = false;
         sessio.TancadaAt  = DateTime.UtcNow;
 
-        // Desconnecta tots els registres actius
+        // Recull els IDs dels alumnes connectats ABANS de desconnectar-los
+        var studentsConnectats = sessio.Registres
+            .Where(r => r.Estat is EstatConnexio.Connectat or EstatConnexio.SenseCheckin
+                     && r.StudentId.HasValue)
+            .Select(r => r.StudentId!.Value)
+            .Distinct()
+            .ToList();
+
         foreach (var r in sessio.Registres.Where(r =>
             r.Estat is EstatConnexio.Connectat or EstatConnexio.SenseCheckin))
         {
@@ -185,8 +192,12 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         }
         await db.SaveChangesAsync();
 
-        // Notifica tots els alumnes que la sessió ha tancat
+        // Notifica el professor (canal sessió)
         _ = hub.NotificaSessioTancadaGlobalAsync(sessioId);
+        // Notifica cada alumne individualment (canal alumne)
+        foreach (var sid in studentsConnectats)
+            _ = hub.NotificaSessioTancadaAsync(sid);
+
         return (true, null);
     }
 
