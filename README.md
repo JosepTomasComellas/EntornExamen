@@ -1,4 +1,4 @@
-# EntornExamen · v2.7.2
+# EntornExamen · v2.9.0
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 
@@ -89,8 +89,14 @@ nano .env
 | `ADMIN_PASSWORD` | ✓ | Contrasenya de l'administrador |
 | `ADMIN_NOM` | ✓ | Nom de l'administrador |
 | `ADMIN_COGNOMS` | | Cognoms de l'administrador |
+| `TZ` | | Zona horària dels contenidors (per defecte: `Europe/Madrid`) |
+| `LOG_LEVEL` | | Nivell de log framework (per defecte: `Warning`). Els logs propis sempre en `Information`. |
 | `EXAMEN_DOMINI_EMAIL` | | Domini acceptat (per defecte: `sarria.salesians.cat`) |
 | `EXAMEN_CHECKIN_INTERVAL_SECONDS` | | Interval check-in en segons (per defecte: `30`) |
+| `EXAMEN_SENSE_CHECKIN_FACTOR` | | Factor ×interval per passar a "Sense check-in" (per defecte: `2`) |
+| `EXAMEN_DESCONNECTAT_FACTOR` | | Factor ×interval per marcar com a desconnectat (per defecte: `4`) |
+| `EXAMEN_MODE_PRO` | | `true` permet IPs duplicades (per a proves locals, per defecte: `false`) |
+| `EXAMEN_DHCP_NETWORK_PREFIX` | | Prefix de la xarxa DHCP (per defecte: `192.168.100.`) |
 | `SMTP_HOST` | | Servidor SMTP (opcional, per a correu de professors) |
 
 ### 3. Configurar el servidor DHCP
@@ -138,7 +144,8 @@ docker volume rm \
   entornexamen_redis-data \
   entornexamen_dp-keys \
   entornexamen_api-backups \
-  entornexamen_fotos-alumnes
+  entornexamen_fotos-alumnes \
+  entornexamen_nginx-logs
 
 # 3. Reconstrueix les imatges des de zero
 docker compose build --no-cache
@@ -197,39 +204,44 @@ EntornExamen/
 │   ├── Hubs/
 │   │   └── ExamenHub.cs          # Publicador Redis (temps real)
 │   ├── Services/
-│   │   ├── ExamenService.cs      # Lògica sessions + check-in per IP
-│   │   ├── DhcpMonitorService.cs # Monitor dhcpd.leases (IHostedService)
-│   │   ├── DnsMonitorService.cs  # Monitor dns-queries.log (IHostedService)
-│   │   ├── AuthService.cs        # Login professors (JWT)
-│   │   ├── ClassService.cs       # Classes + alumnes
-│   │   ├── BackupService.cs      # Export/import JSON
-│   │   └── EmailService.cs       # SMTP (professors)
-│   └── Program.cs                # Endpoints + DI
-├── web/                          # Blazor Server + MudBlazor
+│   │   ├── ExamenService.cs         # Lògica sessions + check-in per IP
+│   │   ├── DhcpMonitorService.cs    # Monitor dhcpd.leases (IHostedService)
+│   │   ├── DnsMonitorService.cs     # Monitor dns-queries.log (IHostedService)
+│   │   ├── CheckinTimeoutService.cs # Detecta check-ins aturats → Desconnectat
+│   │   ├── NginxLogMonitorService.cs# Acumula bytes/requestes per IP des del log nginx
+│   │   ├── SessioCleanupService.cs  # Neteja sessions tancades fa >30 dies
+│   │   ├── AuthService.cs           # Login professors (JWT)
+│   │   ├── ClassService.cs          # Classes + alumnes
+│   │   ├── BackupService.cs         # Export/import JSON
+│   │   └── EmailService.cs          # SMTP (professors)
+│   └── Program.cs                   # Endpoints + DI
+├── web/                             # Blazor Server + MudBlazor
 │   ├── Components/Pages/
-│   │   ├── Examen/Portal.razor   # /examen (alumne, sense auth)
+│   │   ├── Examen/Portal.razor      # /examen (alumne, sense auth)
 │   │   ├── Professor/
-│   │   │   ├── Dashboard.razor   # /professor/dashboard
-│   │   │   ├── Examen.razor      # /professor/examen (plafó professor)
-│   │   │   ├── Classes.razor     # /professor/classes
-│   │   │   └── Alumnes.razor     # /professor/alumnes/{id}
+│   │   │   ├── Dashboard.razor      # /professor/dashboard
+│   │   │   ├── Examen.razor         # /professor/examen (plafó professor)
+│   │   │   ├── Classes.razor        # /professor/classes
+│   │   │   └── Alumnes.razor        # /professor/alumnes/{id}
 │   │   └── Admin/
-│   │       ├── Professors.razor  # /admin/professors
-│   │       ├── ExamenMacs.razor  # /admin/examen-macs
-│   │       ├── Backup.razor      # /admin/backup
-│   │       └── Estadistiques.razor # /admin/estadistiques
+│   │       ├── Professors.razor     # /admin/professors
+│   │       ├── ExamenMacs.razor     # /admin/examen-macs
+│   │       ├── Backup.razor         # /admin/backup
+│   │       └── Estadistiques.razor  # /admin/estadistiques
 │   ├── Services/
-│   │   ├── ApiClient.cs          # Client HTTP cap a l'API
-│   │   ├── UserStateService.cs   # Sessió Blazor (JWT professors)
+│   │   ├── ApiClient.cs             # Client HTTP cap a l'API
+│   │   ├── UserStateService.cs      # Sessió Blazor (JWT professors)
+│   │   ├── ExamenCircuitState.cs    # Estat alumne per circuit Blazor
+│   │   ├── ExamenCircuitHandler.cs  # Detecta tancament del navegador (CircuitHandler)
 │   │   ├── ExamenNotificationService.cs  # Bus intern notificacions
 │   │   └── ExamenRedisSubscriber.cs      # Subscriptor Redis
 │   └── Resources/
-│       └── DictionaryLocalizer.cs  # i18n estàtica (ca/es)
+│       └── DictionaryLocalizer.cs   # i18n estàtica (ca/es)
 ├── shared/
-│   ├── Dtos.cs                   # Tots els DTOs compartits
-│   └── AppVersion.cs             # Versió actual
-├── AutoCo.Tests/
-│   └── ExamenServiceTests.cs     # Tests unitaris ExamenService
+│   ├── Dtos.cs                      # Tots els DTOs compartits
+│   └── AppVersion.cs                # Versió actual
+├── EntornExamen.Tests/
+│   └── ExamenServiceTests.cs        # Tests unitaris ExamenService
 ├── scripts/examen/               # Configuració DHCP + DNS
 │   ├── dhcp-hook.sh
 │   ├── dhcpd.conf
@@ -278,6 +290,8 @@ Class ────< SessioExamen ──< RegistreConnexio ──< PeticioTdns
 | `DELETE` | `/api/examen/sessions/{id}/missatge` | JWT | Esborra missatge |
 | `GET` | `/api/examen/sessions/{id}/exportar` | JWT | Exporta CSV |
 | `POST` | `/api/examen/checkin` | — | Check-in alumne (per IP) |
+| `POST` | `/api/examen/sortida` | — | Sortida voluntària alumne |
+| `POST` | `/api/examen/sortida-circuit/{studentId}` | — | Sortida per circuit tancat (intern web) |
 | `POST` | `/api/examen/dhcp/event` | — | Event DHCP (hook) |
 | `POST` | `/api/examen/dns/event` | — | Event DNS |
 | `GET/DELETE` | `/api/examen/macs` | JWT admin | Gestió dispositius |
@@ -295,6 +309,26 @@ dotnet test AutoCo.Tests/
 ---
 
 ## Changelog
+
+### v2.9.0 (2026-04-28)
+- **Fix crític: detecció de tancament de navegador** — el timer de check-in corria al servidor (Blazor Server) fins que el circuit expirava (~3 min), impedint que `CheckinTimeoutService` detectés la desconnexió. Implementat `ExamenCircuitHandler`: en detectar la pèrdua de connexió SignalR, espera 15 s per reconnexions breus i llavors marca l'alumne com a desconnectat a la BD i notifica el professor. Temps total fins a notificació: ~15 s.
+- `DisconnectedCircuitRetentionPeriod = 40 s` — xarxa de seguretat addicional per aturar el timer de Portal.razor
+- Nou endpoint intern `POST /api/examen/sortida-circuit/{studentId}` per al CircuitHandler (opera per studentId, no per IP)
+- **Logs nginx JSON estructurats** (`log_format json_exam`) escrits a fitxer real al volum `nginx-logs`
+- `NginxLogMonitorService`: cua el log nginx cada 5 s i acumula bytes enviats i nombre de requestes per IP als `RegistreConnexio` actius
+- Panell de detall de l'alumne mostra **Tràfic** (bytes en format B/KB/MB + nombre de requestes)
+- **Timezone configurable**: `TZ=Europe/Madrid` al `.env`, propagat a tots els contenidors Docker
+- **Nivell de log configurable**: `LOG_LEVEL=Warning` al `.env`; els logs propis (`EntornExamen.*`) sempre en `Information`
+- **Mode proves** (`EXAMEN_MODE_PRO=true`): permet múltiples alumnes amb la mateixa IP per a proves locals; desactiva la comprovació d'una sola estació i cerca el registre per studentId en lloc d'IP
+- `ExamenAlumneDto`: afegit `RegistreId` (int, identificador únic de connexió) i `BytesEnviats`/`NumRequestes` (nullable)
+- `RegistreConnexio`: nous camps `BytesEnviats (BIGINT NULL)` i `NumRequestes (INT NULL)`; DDL idempotent a l'arrencada
+- `real_ip` nginx: `set_real_ip_from` per a xarxes internes 10.x, 172.16.x, 192.168.x; `real_ip_recursive on`
+
+### v2.8.x (2026-04-28)
+- v2.8.3: snackbar de desconnexió al plafó del professor (`ISnackbar`, `SnackbarDuplicatesBehavior.Allow`); factors `SenseCheckin`/`Desconnectat` configurables via `.env` com a `double`
+- v2.8.2: alumne visible immediatament al plafó del professor en fer check-in (sense esperar el primer auto-refresh)
+- v2.8.1: correcció factors timeout (s'accepten decimals amb `CultureInfo.InvariantCulture`)
+- v2.8.0: `CheckinTimeoutService` (background service): `Connectat → SenseCheckin` i `SenseCheckin → Desconnectat` per check-ins aturats. Factors configurables via `.env`; historial de connexions en format compacte scrollable; alumne expulsat de la sessió quan el professor la tanca; `DhcpNetworkPrefix` configurable via `.env`
 
 ### v2.7.2 (2026-04-28)
 - Fix crític: la icona de sortida voluntària al plafó professor **mai apareixia** — l'event `AlumneDesconnectatVoluntari` no estava al deserialitzador Redis i arribava com a `object` buit, fent fallar el pattern match
