@@ -20,7 +20,8 @@ builder.Logging.AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Error)
 
 // ── Base de dades ─────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    opt.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
+        sql => sql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
 // ── JWT ───────────────────────────────────────────────────────────────────────
 var jwtSecret = builder.Configuration["JwtSettings:Secret"]
