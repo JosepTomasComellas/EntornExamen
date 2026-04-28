@@ -1,4 +1,4 @@
-# EntornExamen · v2.6.0
+# EntornExamen · v2.7.0
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 
@@ -295,6 +295,14 @@ dotnet test AutoCo.Tests/
 ---
 
 ## Changelog
+
+### v2.7.0 (2026-04-28)
+- Llista de sessions recents visible a tots els professors (substitueix el MudSelect d'admin): estat, classe, títol, data d'inici/tancament; botó d'eliminació directa a les sessions tancades
+- Historial de connexions cercat i filtrable per nom d'alumne o text d'event (fins a 200 entrades, ordre cronològic invers)
+- Temps endarreriment check-in en temps real (timer 5 s): cada targeta i el pannell de detall mostren "fa Xs / fa Xm Ys" amb codi de colors (verd / taronja / vermell) en funció de l'interval de sessió
+- `IntervalSegons` propagat des de la configuració del servidor fins a `SessioExamenDto` i usat per al codi de colors d'endarreriment
+- Portal alumne (`/examen`) redissenyat per ser visualment idèntic al login de professor (capçalera fosca, `MudPaper` arrodonit, format compact)
+- Fase "Connectat" del portal amb capçalera fosca (avatar + nom + classe), barra de progrés i botó de sortida
 
 ### v2.6.0 (2026-04-27)
 - Fix: desubscripció de notificacions Redis en sortida/expulsió de l'alumne
