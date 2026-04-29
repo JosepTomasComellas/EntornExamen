@@ -46,7 +46,8 @@ public record BulkCreateResult(int Created, int Skipped, List<string> Errors);
 public record BackupDto(
     string Version, DateTime CreatedAt,
     List<ProfessorBackupDto> Professors,
-    List<ClassBackupDto>     Classes);
+    List<ClassBackupDto>     Classes,
+    List<RecursExamenBackupDto>? Recursos = null);
 
 public record ProfessorBackupDto(
     int Id, string Email, string Nom, string Cognoms,
@@ -59,6 +60,9 @@ public record ClassBackupDto(
 public record StudentBackupDto(
     int Id, string Nom, string Cognoms, int NumLlista,
     string Email, string? Dni, DateTime CreatedAt);
+
+public record RecursExamenBackupDto(
+    int Id, string Icona, string Etiqueta, string Url, int Ordre);
 
 public record BackupFileInfoDto(string Name, DateTime CreatedAt, long SizeBytes);
 

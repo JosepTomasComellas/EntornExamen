@@ -341,7 +341,10 @@
         if (result is null)
             Snackbar.Add(Loc["Backup_DownloadError"].Value, Severity.Error);
         else
-            await DownloadBytesAsync(result.Value.Content, result.Value.FileName);
+        {
+            var mime = name.EndsWith(".zip") ? "application/zip" : "application/json";
+            await DownloadBytesAsync(result.Value.Content, result.Value.FileName, mime);
+        }
     }
 
     private async Task RestoreServerBackupAsync(string name)

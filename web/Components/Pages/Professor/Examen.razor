@@ -663,10 +663,14 @@
                 @foreach (var r in _recursosDisponibles.OrderBy(r => r.Ordre))
                 {
                     var rid = r.Id;
-                    <MudCheckBox T="bool"
-                                 Value="@_novaRecursIds.Contains(rid)"
-                                 ValueChanged="@(v => { if (v) _novaRecursIds.Add(rid); else _novaRecursIds.Remove(rid); })"
-                                 Label="@r.Etiqueta" />
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudCheckBox T="bool"
+                                     Value="@_novaRecursIds.Contains(rid)"
+                                     ValueChanged="@(v => { if (v) _novaRecursIds.Add(rid); else _novaRecursIds.Remove(rid); })"
+                                     Dense="true" />
+                        <MudIcon Icon="@IconaMatIcon(r.Icona)" Size="Size.Small" Color="Color.Primary" />
+                        <MudText Typo="Typo.body2">@r.Etiqueta</MudText>
+                    </MudStack>
                 }
             }
         </MudStack>
@@ -737,10 +741,14 @@
         @foreach (var r in _recursosDisponibles.OrderBy(r => r.Ordre))
         {
             var rid = r.Id;
-            <MudCheckBox T="bool"
-                         Value="@_sessioRecursIds.Contains(rid)"
-                         ValueChanged="@(v => { if (v) _sessioRecursIds.Add(rid); else _sessioRecursIds.Remove(rid); })"
-                         Label="@r.Etiqueta" />
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudCheckBox T="bool"
+                             Value="@_sessioRecursIds.Contains(rid)"
+                             ValueChanged="@(v => { if (v) _sessioRecursIds.Add(rid); else _sessioRecursIds.Remove(rid); })"
+                             Dense="true" />
+                <MudIcon Icon="@IconaMatIcon(r.Icona)" Size="Size.Small" Color="Color.Primary" />
+                <MudText Typo="Typo.body2">@r.Etiqueta</MudText>
+            </MudStack>
         }
     </DialogContent>
     <DialogActions>
@@ -1087,9 +1095,11 @@
     {
         if (_sessioId is null) return;
         _carregant = true;
-        await Api.SetSessioRecursosAsync(_sessioId.Value, [.. _sessioRecursIds]);
+        var ok = await Api.SetSessioRecursosAsync(_sessioId.Value, [.. _sessioRecursIds]);
         _carregant = false;
         _mostrarDialegRecursos = false;
+        if (ok) Snackbar.Add("Recursos actualitzats correctament.", Severity.Success);
+        else    Snackbar.Add("Error en actualitzar els recursos.", Severity.Error);
         await CarregarDashboard();
         StateHasChanged();
     }
@@ -1174,6 +1184,13 @@
         if (bytes >= 1_048_576) return $"{bytes / 1_048_576.0:F1} MB";
         if (bytes >= 1_024)     return $"{bytes / 1_024.0:F1} KB";
         return $"{bytes} B";
+    }
+
+    private static string IconaMatIcon(string nom)
+    {
+        var field = typeof(Icons.Material.Filled).GetField(nom,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        return field?.GetValue(null) as string ?? Icons.Material.Filled.Link;
     }
 
     public void Dispose()
