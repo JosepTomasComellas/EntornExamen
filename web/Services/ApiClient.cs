@@ -278,6 +278,13 @@ public class ApiClient
     public Task<bool> DeleteRecursExamenAsync(int id) =>
         DeleteAsync($"/api/admin/recursos/{id}");
 
+    public Task<List<RecursExamenDto>?> GetSessioRecursosAsync(int sessioId) =>
+        GetAsync<List<RecursExamenDto>>($"/api/examen/sessions/{sessioId}/recursos");
+
+    public Task<bool> SetSessioRecursosAsync(int sessioId, List<int> recursIds) =>
+        PutNoContentAsync($"/api/examen/sessions/{sessioId}/recursos",
+            new SetSessioRecursosRequest(recursIds));
+
     // ── Diagnòstic (admin) ────────────────────────────────────────────────────
 
     public Task<DiagnosticDto?> GetDiagnosticAsync() =>
@@ -326,6 +333,31 @@ public class ApiClient
 
     public Task<ImportResult?> RestoreBackupFileAsync(string name) =>
         PostAsync<ImportResult>($"/api/admin/backup/files/{Uri.EscapeDataString(name)}/restore", null);
+
+    public async Task<(byte[] Content, string FileName)?> ExportBackupZipAsync()
+    {
+        var resp = await _http.GetAsync("/api/admin/backup/export-zip");
+        if (!resp.IsSuccessStatusCode) { CheckUnauthorized(resp); return null; }
+        var bytes    = await resp.Content.ReadAsByteArrayAsync();
+        var fileName = resp.Content.Headers.ContentDisposition?.FileNameStar
+            ?? resp.Content.Headers.ContentDisposition?.FileName
+            ?? $"backup_complet_{DateTime.UtcNow:yyyyMMdd_HHmmss}.zip";
+        return (bytes, fileName.Trim('"'));
+    }
+
+    public async Task<(ImportResult? Result, string? Error)> ImportBackupZipAsync(MultipartFormDataContent form)
+    {
+        var resp = await _http.PostAsync("/api/admin/backup/import-zip", form);
+        if (resp.IsSuccessStatusCode)
+            return (await resp.Content.ReadFromJsonAsync<ImportResult>(_json), null);
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+            var err = doc.RootElement.TryGetProperty("error", out var e) ? e.GetString() : null;
+            return (null, err ?? "Error desconegut.");
+        }
+        catch { return (null, "Error desconegut."); }
+    }
 
     // ── Privats ───────────────────────────────────────────────────────────────
 

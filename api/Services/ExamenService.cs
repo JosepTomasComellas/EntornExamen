@@ -32,6 +32,8 @@ public interface IExamenService
     Task<(bool Ok, string? Error)> ExpulsarAsync(int sessioId, int studentId, int professorId, bool isAdmin);
     Task<List<AlumneMacDto>> GetMacsAsync(bool isAdmin);
     Task<bool> DeleteMacAsync(int id, bool isAdmin);
+    Task<List<RecursExamenDto>> GetSessioRecursosAsync(int sessioId, int professorId, bool isAdmin);
+    Task<bool> SetSessioRecursosAsync(int sessioId, List<int> recursIds, int professorId, bool isAdmin);
 }
 
 public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config,
@@ -121,10 +123,22 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             Descripcio      = req.Descripcio?.Trim(),
             IniciadaAt      = DateTime.UtcNow,
             Activa          = true,
-            MostrarRecursos = req.MostrarRecursos
+            MostrarRecursos = req.RecursIds?.Count > 0
         };
         db.SessionsExamen.Add(sessio);
         await db.SaveChangesAsync();
+
+        if (req.RecursIds is { Count: > 0 })
+        {
+            var recursValids = await db.RecursosExamen
+                .Where(r => req.RecursIds.Contains(r.Id))
+                .Select(r => r.Id)
+                .ToListAsync();
+            db.SessioExamenRecursos.AddRange(
+                recursValids.Select(rid => new SessioExamenRecurs
+                    { SessioId = sessio.Id, RecursId = rid }));
+            await db.SaveChangesAsync();
+        }
 
         await db.Entry(sessio).Reference(s => s.Class).LoadAsync();
         await db.Entry(sessio).Reference(s => s.Professor).LoadAsync();
@@ -397,20 +411,20 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         _ = hub.NotificaNouCheckinAsync(sessio.Id, new ExamenEventAlumne(
             student.Id, student.Nom, student.Cognoms, clientIp, registre.MacAddress, ara));
 
-        List<RecursExamenDto>? recursos = null;
-        if (sessio.MostrarRecursos)
-        {
-            recursos = await db.RecursosExamen
-                .OrderBy(r => r.Ordre).ThenBy(r => r.Id)
-                .Select(r => new RecursExamenDto(r.Id, r.Icona, r.Etiqueta, r.Url, r.Ordre))
-                .ToListAsync();
-        }
+        var recursos = await db.SessioExamenRecursos
+            .Where(sr => sr.SessioId == sessio.Id)
+            .Include(sr => sr.Recurs)
+            .OrderBy(sr => sr.Recurs.Ordre).ThenBy(sr => sr.Recurs.Id)
+            .Select(sr => new RecursExamenDto(
+                sr.Recurs.Id, sr.Recurs.Icona, sr.Recurs.Etiqueta, sr.Recurs.Url, sr.Recurs.Ordre))
+            .ToListAsync();
 
         return (new CheckinResponse(
             new CheckinAlumneInfo(student.Id, student.Nom, student.Cognoms,
                 student.Class.Name, TryFotoUrl(student.Id)),
             new CheckinSessioInfo(sessio.Id, sessio.Titol, sessio.Descripcio,
-                sessio.MissatgeActiu, CheckinIntervalSegons, sessio.MostrarRecursos, recursos)),
+                sessio.MissatgeActiu, CheckinIntervalSegons,
+                recursos.Count > 0, recursos.Count > 0 ? recursos : null)),
             null);
     }
 
@@ -647,21 +661,28 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
     {
         if (!isAdmin) return [];
 
-        return await db.AlumneMacs
+        var rows = await db.AlumneMacs
             .Include(m => m.Student)
                 .ThenInclude(s => s.Class)
             .OrderBy(m => m.Student != null ? m.Student.Class!.Name : "")
             .ThenBy(m => m.Student != null ? m.Student.Cognoms : "")
             .ThenBy(m => m.PrimerCopVist)
-            .Select(m => new AlumneMacDto(
+            .Select(m => new {
                 m.Id, m.StudentId,
-                m.Student != null ? m.Student.Nom : "—",
-                m.Student != null ? m.Student.Cognoms : "—",
-                m.Student != null ? m.Student.Email : "—",
-                m.Student != null && m.Student.Class != null ? m.Student.Class.Name : "—",
-                m.Mac, m.Dispositiu, m.PrimerCopVist,
-                m.StudentId > 0 ? TryFotoUrl(m.StudentId) : null))
+                Nom      = m.Student != null ? m.Student.Nom     : "—",
+                Cognoms  = m.Student != null ? m.Student.Cognoms : "—",
+                Email    = m.Student != null ? m.Student.Email   : "—",
+                Classe   = m.Student != null && m.Student.Class != null ? m.Student.Class.Name : "—",
+                m.Mac, m.Dispositiu, m.PrimerCopVist
+            })
             .ToListAsync();
+
+        return rows.Select(m => new AlumneMacDto(
+            m.Id, m.StudentId,
+            m.Nom, m.Cognoms, m.Email, m.Classe,
+            m.Mac, m.Dispositiu, m.PrimerCopVist,
+            m.StudentId > 0 ? TryFotoUrl(m.StudentId) : null))
+            .ToList();
     }
 
     public async Task<bool> DeleteMacAsync(int id, bool isAdmin)
@@ -1013,5 +1034,50 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         }
 
         return (new ImportacioFotosResult(importades, noTrobades, errors), null);
+    }
+
+    // ─── Recursos per sessió ──────────────────────────────────────────────────
+
+    public async Task<List<RecursExamenDto>> GetSessioRecursosAsync(
+        int sessioId, int professorId, bool isAdmin)
+    {
+        var ok = await db.SessionsExamen.AnyAsync(s => s.Id == sessioId &&
+            (isAdmin || s.ProfessorId == professorId));
+        if (!ok) return [];
+
+        return await db.SessioExamenRecursos
+            .Where(sr => sr.SessioId == sessioId)
+            .Include(sr => sr.Recurs)
+            .OrderBy(sr => sr.Recurs.Ordre).ThenBy(sr => sr.Recurs.Id)
+            .Select(sr => new RecursExamenDto(
+                sr.Recurs.Id, sr.Recurs.Icona, sr.Recurs.Etiqueta, sr.Recurs.Url, sr.Recurs.Ordre))
+            .ToListAsync();
+    }
+
+    public async Task<bool> SetSessioRecursosAsync(
+        int sessioId, List<int> recursIds, int professorId, bool isAdmin)
+    {
+        var sessio = await db.SessionsExamen.FirstOrDefaultAsync(s => s.Id == sessioId &&
+            (isAdmin || s.ProfessorId == professorId));
+        if (sessio is null) return false;
+
+        // Substitueix tota la selecció
+        var existents = db.SessioExamenRecursos.Where(sr => sr.SessioId == sessioId);
+        db.SessioExamenRecursos.RemoveRange(existents);
+
+        if (recursIds.Count > 0)
+        {
+            var recursValids = await db.RecursosExamen
+                .Where(r => recursIds.Contains(r.Id))
+                .Select(r => r.Id)
+                .ToListAsync();
+            db.SessioExamenRecursos.AddRange(
+                recursValids.Select(rid => new SessioExamenRecurs
+                    { SessioId = sessioId, RecursId = rid }));
+        }
+
+        sessio.MostrarRecursos = recursIds.Count > 0;
+        await db.SaveChangesAsync();
+        return true;
     }
 }

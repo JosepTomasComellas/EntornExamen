@@ -237,6 +237,19 @@ using (var scope = app.Services.CreateScope())
         BEGIN
             ALTER TABLE [SessionsExamen] ADD [MostrarRecursos] BIT NOT NULL DEFAULT 0;
         END
+
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'SessioExamenRecursos')
+        BEGIN
+            CREATE TABLE [SessioExamenRecursos] (
+                [SessioId] INT NOT NULL,
+                [RecursId] INT NOT NULL,
+                CONSTRAINT [PK_SessioExamenRecursos] PRIMARY KEY ([SessioId], [RecursId]),
+                CONSTRAINT [FK_SessioExamenRecursos_SessionsExamen]
+                    FOREIGN KEY ([SessioId]) REFERENCES [SessionsExamen]([Id]) ON DELETE CASCADE,
+                CONSTRAINT [FK_SessioExamenRecursos_RecursosExamen]
+                    FOREIGN KEY ([RecursId]) REFERENCES [RecursosExamen]([Id]) ON DELETE CASCADE
+            );
+        END
         """);
 
     // SQL Server Express activa AUTO_CLOSE per defecte: desactivar-lo evita
@@ -739,6 +752,27 @@ app.MapPost("/api/admin/backup/files/{name}/restore", async (
     return result.Success ? Results.Ok(result) : Results.BadRequest(result);
 }).RequireAuthorization();
 
+// Backup complet ZIP (JSON + fotos)
+app.MapGet("/api/admin/backup/export-zip", async (IBackupService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    var (data, name) = await svc.ExportZipAsync();
+    return Results.File(data, "application/zip", name);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/backup/import-zip", async (HttpRequest httpReq,
+    IBackupService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    if (!httpReq.HasFormContentType) return Results.BadRequest(new { error = "Cal multipart/form-data." });
+    var form = await httpReq.ReadFormAsync();
+    var fitxer = form.Files.GetFile("fitxer");
+    if (fitxer is null) return Results.BadRequest(new { error = "Camp 'fitxer' no trobat." });
+    using var stream = fitxer.OpenReadStream();
+    var result = await svc.ImportZipAsync(stream);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+}).RequireAuthorization();
+
 // ════════════════════════════════════════════════════════════════════════════
 // ENTORN EXAMEN
 // ════════════════════════════════════════════════════════════════════════════
@@ -1013,6 +1047,24 @@ app.MapDelete("/api/admin/recursos/{id:int}", async (int id, AppDbContext db,
     db.RecursosExamen.Remove(recurs);
     await db.SaveChangesAsync();
     return Results.NoContent();
+}).RequireAuthorization();
+
+// ── Recursos per sessió (professor) ──────────────────────────────────────────
+
+app.MapGet("/api/examen/sessions/{id:int}/recursos", async (int id, IExamenService svc,
+    ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var recursos = await svc.GetSessioRecursosAsync(id, GetUserId(user), IsAdmin(user));
+    return Results.Ok(recursos);
+}).RequireAuthorization();
+
+app.MapPut("/api/examen/sessions/{id:int}/recursos", async (int id, SetSessioRecursosRequest req,
+    IExamenService svc, ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var ok = await svc.SetSessioRecursosAsync(id, req.RecursIds, GetUserId(user), IsAdmin(user));
+    return ok ? Results.NoContent() : Results.NotFound();
 }).RequireAuthorization();
 
 app.Run();

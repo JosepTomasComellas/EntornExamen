@@ -97,6 +97,62 @@
         </MudCard>
     </MudItem>
 
+    <!-- ── Còpia completa ZIP (JSON + fotos) ─────────────────────── -->
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2" Style="border:1px solid var(--mud-palette-success)">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">
+                        <MudIcon Icon="@Icons.Material.Filled.FolderZip" />
+                    </MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Còpia completa (ZIP)</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Inclou la configuració i totes les fotos dels alumnes
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Class="mb-3">
+                    Genera un ZIP amb el JSON de configuració i totes les fotos dels alumnes.
+                    Ideal per fer una còpia de seguretat completa.
+                </MudText>
+                <MudDivider Class="mb-3" />
+                <MudText Typo="Typo.body2" Class="mb-2" Color="Color.Warning">
+                    <strong>Restaurar:</strong> importa tant la configuració com les fotos.
+                </MudText>
+                <InputFile id="importZipFile" OnChange="OnZipFileSelected" accept=".zip" style="display:none" />
+                <MudButton Variant="Variant.Outlined" Color="Color.Warning" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.AttachFile"
+                           OnClick='() => JS.InvokeVoidAsync("eval", "document.getElementById(\"importZipFile\").click()")'>
+                    @(_importZipFile is null ? "Selecciona ZIP..." : _importZipFile.Name)
+                </MudButton>
+            </MudCardContent>
+            <MudCardActions Class="px-4 pb-4 gap-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Success"
+                           StartIcon="@Icons.Material.Filled.FileDownload"
+                           OnClick="ExportZipAsync" Disabled="_exportingZip">
+                    @if (_exportingZip)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    Descarregar ZIP
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Warning"
+                           StartIcon="@Icons.Material.Filled.RestorePage"
+                           OnClick="ImportZipAsync"
+                           Disabled="@(_importZipFile is null || _importingZip)">
+                    @if (_importingZip)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    Restaurar ZIP
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
     <!-- ── Còpies al servidor ───────────────────────────────────── -->
     <MudItem xs="12">
         <MudCard Elevation="2">
@@ -177,10 +233,13 @@
 @code {
     private bool _exporting    = false;
     private bool _importing    = false;
+    private bool _exportingZip = false;
+    private bool _importingZip = false;
     private bool _creating     = false;
     private bool _loadingFiles = true;
 
     private IBrowserFile? _importFile;
+    private IBrowserFile? _importZipFile;
     private List<BackupFileInfoDto> _files = [];
 
     protected override async Task OnInitializedAsync()
@@ -320,11 +379,52 @@
             Snackbar.Add(Loc["Backup_DeleteError"].Value, Severity.Error);
     }
 
+    // ── ZIP complet ───────────────────────────────────────────────────────────
+    private void OnZipFileSelected(InputFileChangeEventArgs e) => _importZipFile = e.File;
+
+    private async Task ExportZipAsync()
+    {
+        _exportingZip = true;
+        var result = await Api.ExportBackupZipAsync();
+        _exportingZip = false;
+        if (result is null) { Snackbar.Add("Error generant el ZIP.", Severity.Error); return; }
+        await DownloadBytesAsync(result.Value.Content, result.Value.FileName, "application/zip");
+        Snackbar.Add("ZIP descarregat correctament.", Severity.Success);
+    }
+
+    private async Task ImportZipAsync()
+    {
+        if (_importZipFile is null) return;
+        var confirmed = await Dialog.ShowMessageBox(
+            "Restaurar còpia ZIP",
+            "S'esborraran totes les dades actuals (configuració i fotos) i es substituiran pel contingut del ZIP. Continuar?",
+            yesText: "Sí, restaurar", cancelText: Loc["Action_Cancel"].Value);
+        if (confirmed != true) return;
+
+        _importingZip = true;
+        try
+        {
+            using var stream = _importZipFile.OpenReadStream(maxAllowedSize: 500 * 1024 * 1024);
+            var form = new MultipartFormDataContent();
+            form.Add(new StreamContent(stream), "fitxer", _importZipFile.Name);
+            var (result, error) = await Api.ImportBackupZipAsync(form);
+            if (result?.Success == true)
+            {
+                Snackbar.Add($"Restaurat: {result.Professors} professors, {result.Classes} classes, {result.Students} alumnes.", Severity.Success);
+                _importZipFile = null;
+            }
+            else
+                Snackbar.Add($"Error: {error ?? result?.Error ?? "desconegut"}", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _importingZip = false; }
+    }
+
     // ── Utilitats ──────────────────────────────────────────────────────────────
-    private async Task DownloadBytesAsync(byte[] data, string fileName)
+    private async Task DownloadBytesAsync(byte[] data, string fileName, string mime = "application/json")
     {
         var base64 = Convert.ToBase64String(data);
-        await JS.InvokeVoidAsync("downloadBase64File", base64, fileName, "application/json");
+        await JS.InvokeVoidAsync("downloadBase64File", base64, fileName, mime);
     }
 
     private static string FormatSize(long bytes)

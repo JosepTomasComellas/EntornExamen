@@ -62,6 +62,14 @@
                    OnClick="() => _mostrarDialegMissatge = true">
             @Loc["Examen_SendMessage"]
         </MudButton>
+        @if (_recursosDisponibles.Count > 0)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Link"
+                       OnClick="ObrirDialegRecursos">
+                Recursos
+            </MudButton>
+        }
     }
     else if (_sessio is not null && !_sessio.Activa)
     {
@@ -649,8 +657,18 @@
             <MudTextField @bind-Value="_novaDescripcio"
                           Label="@Loc["Examen_Instructions"]"
                           Variant="Variant.Outlined" Lines="3" />
-            <MudSwitch T="bool" @bind-Value="_novaMostrarRecursos"
-                       Color="Color.Primary" Label="Mostrar recursos (icones i enllaços)" />
+            @if (_recursosDisponibles.Count > 0)
+            {
+                <MudText Typo="Typo.body2">Recursos que es mostraran als alumnes:</MudText>
+                @foreach (var r in _recursosDisponibles.OrderBy(r => r.Ordre))
+                {
+                    var rid = r.Id;
+                    <MudCheckBox T="bool"
+                                 Value="@_novaRecursIds.Contains(rid)"
+                                 ValueChanged="@(v => { if (v) _novaRecursIds.Add(rid); else _novaRecursIds.Remove(rid); })"
+                                 Label="@r.Etiqueta" />
+                }
+            }
         </MudStack>
         @if (_errorNovaSessio is not null)
         {
@@ -704,6 +722,38 @@
     </DialogActions>
 </MudDialog>
 
+<!-- Diàleg recursos sessió activa -->
+<MudDialog @bind-Visible="_mostrarDialegRecursos">
+    <TitleContent>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.Link" Color="Color.Info" />
+            <MudText Typo="Typo.h6">Recursos de la sessió</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Selecciona els recursos que es mostraran als alumnes. El canvi és immediat.
+        </MudText>
+        @foreach (var r in _recursosDisponibles.OrderBy(r => r.Ordre))
+        {
+            var rid = r.Id;
+            <MudCheckBox T="bool"
+                         Value="@_sessioRecursIds.Contains(rid)"
+                         ValueChanged="@(v => { if (v) _sessioRecursIds.Add(rid); else _sessioRecursIds.Remove(rid); })"
+                         Label="@r.Etiqueta" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _mostrarDialegRecursos = false">
+            @Loc["Action_Cancel"]
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="GuardarRecursosSessio" Disabled="_carregant">
+            @Loc["Action_Save"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private List<SessioExamenDto>  _sessions = [];
     private List<ClassDto>         _classes  = [];
@@ -718,10 +768,13 @@
 
     private bool    _mostrarDialegNovaSessio;
     private bool    _mostrarDialegMissatge;
+    private bool    _mostrarDialegRecursos;
     private int     _novaClasseId;
-    private string  _novaTitol          = "";
-    private string  _novaDescripcio     = "";
-    private bool    _novaMostrarRecursos = false;
+    private string  _novaTitol      = "";
+    private string  _novaDescripcio = "";
+    private HashSet<int> _novaRecursIds  = [];
+    private HashSet<int> _sessioRecursIds = [];
+    private List<RecursExamenDto> _recursosDisponibles = [];
     private string? _errorNovaSessio;
     private string  _textMissatge  = "";
 
@@ -765,8 +818,9 @@
         Api.SetToken(UserState.Token!);
         _dhcpPrefix = Config["Examen:DhcpNetworkPrefix"] ?? "";
         _carregant = true;
-        _classes   = await Api.GetClassesAsync() ?? [];
-        _sessions  = await Api.GetExamenSessionsAsync() ?? [];
+        _classes              = await Api.GetClassesAsync() ?? [];
+        _sessions             = await Api.GetExamenSessionsAsync() ?? [];
+        _recursosDisponibles  = await Api.GetRecursosExamenAsync() ?? [];
 
         var activa = _sessions.FirstOrDefault(s => s.Activa);
         if (activa is not null)
@@ -935,13 +989,13 @@
         }
         _carregant = true;
         var (sessio, error) = await Api.CreateExamenSessioAsync(
-            new CreateSessioRequest(_novaClasseId, _novaTitol, _novaDescripcio, _novaMostrarRecursos));
+            new CreateSessioRequest(_novaClasseId, _novaTitol, _novaDescripcio, [.. _novaRecursIds]));
         _carregant = false;
 
         if (error is not null) { _errorNovaSessio = error; return; }
 
         _mostrarDialegNovaSessio = false;
-        _novaTitol = ""; _novaDescripcio = ""; _novaClasseId = 0; _novaMostrarRecursos = false;
+        _novaTitol = ""; _novaDescripcio = ""; _novaClasseId = 0; _novaRecursIds = [];
         _sessions = await Api.GetExamenSessionsAsync() ?? [];
         if (sessio is not null)
             await SeleccionarSessio(sessio.Id);
@@ -1017,6 +1071,25 @@
         _carregant = false;
         _mostraDetall      = false;
         _alumneSeleccionat = null;
+        await CarregarDashboard();
+        StateHasChanged();
+    }
+
+    private async Task ObrirDialegRecursos()
+    {
+        if (_sessioId is null) return;
+        var actuals = await Api.GetSessioRecursosAsync(_sessioId.Value);
+        _sessioRecursIds = actuals?.Select(r => r.Id).ToHashSet() ?? [];
+        _mostrarDialegRecursos = true;
+    }
+
+    private async Task GuardarRecursosSessio()
+    {
+        if (_sessioId is null) return;
+        _carregant = true;
+        await Api.SetSessioRecursosAsync(_sessioId.Value, [.. _sessioRecursIds]);
+        _carregant = false;
+        _mostrarDialegRecursos = false;
         await CarregarDashboard();
         StateHasChanged();
     }

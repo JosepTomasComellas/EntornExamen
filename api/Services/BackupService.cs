@@ -3,6 +3,7 @@ using EntornExamen.Api.Data.Models;
 using EntornExamen.Shared.DTOs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -17,6 +18,8 @@ public interface IBackupService
     Task<(byte[] Data, string Name)?> DownloadFileAsync(string name);
     Task<bool>                   DeleteFileAsync(string name);
     Task<ImportResult>           RestoreFileAsync(string name);
+    Task<(byte[] Data, string Name)> ExportZipAsync();
+    Task<ImportResult>           ImportZipAsync(Stream zipStream);
 }
 
 public class BackupService(AppDbContext db, IConfiguration cfg, ILogger<BackupService> logger) : IBackupService
@@ -161,6 +164,86 @@ public class BackupService(AppDbContext db, IConfiguration cfg, ILogger<BackupSe
         if (backup is null)
             return new ImportResult(false, "Format invàlid", 0, 0, 0);
         return await ImportAsync(backup);
+    }
+
+    // ── ZIP complet (JSON + fotos) ─────────────────────────────────────────────
+    public async Task<(byte[] Data, string Name)> ExportZipAsync()
+    {
+        var backup    = await ExportAsync();
+        var json      = JsonSerializer.Serialize(backup, _json);
+        var wwwroot   = cfg["Examen:WebWwwrootPath"] ?? "/app/wwwroot";
+        var fotosDir  = Path.Combine(wwwroot, "fotos", "alumnes");
+        var name      = $"backup_complet_{DateTime.UtcNow:yyyyMMdd_HHmmss}.zip";
+
+        using var ms  = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var entry = zip.CreateEntry("backup.json", CompressionLevel.Optimal);
+            await using var sw = new StreamWriter(entry.Open());
+            await sw.WriteAsync(json);
+
+            if (Directory.Exists(fotosDir))
+            {
+                foreach (var foto in Directory.GetFiles(fotosDir, "*.jpg"))
+                {
+                    var entryName = $"fotos/alumnes/{Path.GetFileName(foto)}";
+                    var fe = zip.CreateEntry(entryName, CompressionLevel.Fastest);
+                    await using var fs = File.OpenRead(foto);
+                    await using var fes = fe.Open();
+                    await fs.CopyToAsync(fes);
+                }
+            }
+        }
+        return (ms.ToArray(), name);
+    }
+
+    public async Task<ImportResult> ImportZipAsync(Stream zipStream)
+    {
+        var wwwroot  = cfg["Examen:WebWwwrootPath"] ?? "/app/wwwroot";
+        var fotosDir = Path.Combine(wwwroot, "fotos", "alumnes");
+        Directory.CreateDirectory(fotosDir);
+
+        using var zip = new ZipArchive(zipStream, ZipArchiveMode.Read);
+
+        // Primer importem el JSON
+        var jsonEntry = zip.GetEntry("backup.json");
+        if (jsonEntry is null) return new ImportResult(false, "El ZIP no conté backup.json", 0, 0, 0);
+
+        BackupDto? backup;
+        try
+        {
+            await using var stream = jsonEntry.Open();
+            backup = await JsonSerializer.DeserializeAsync<BackupDto>(stream, _json);
+        }
+        catch (Exception ex)
+        {
+            return new ImportResult(false, $"Error llegint backup.json: {ex.Message}", 0, 0, 0);
+        }
+        if (backup is null) return new ImportResult(false, "Format invàlid", 0, 0, 0);
+
+        var result = await ImportAsync(backup);
+        if (!result.Success) return result;
+
+        // Després restaurem les fotos
+        var fotosRestaurades = 0;
+        foreach (var entry in zip.Entries)
+        {
+            if (!entry.FullName.StartsWith("fotos/alumnes/") || !entry.Name.EndsWith(".jpg")) continue;
+            var destPath = Path.Combine(fotosDir, entry.Name);
+            try
+            {
+                await using var src  = entry.Open();
+                await using var dest = File.Create(destPath);
+                await src.CopyToAsync(dest);
+                fotosRestaurades++;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "No s'ha pogut restaurar la foto {Nom}", entry.Name);
+            }
+        }
+        logger.LogInformation("Backup ZIP restaurat: {Fotos} fotos", fotosRestaurades);
+        return result;
     }
 
     private string? SafePath(string name)
