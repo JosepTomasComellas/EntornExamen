@@ -110,7 +110,9 @@ public record SessioExamenDto(
     int IntervalSegons = 30,
     bool MostrarRecursos = false);
 
-public record CreateSessioRequest(int ClassId, string? Titol, string? Descripcio, bool MostrarRecursos = false);
+public record CreateSessioRequest(int ClassId, string? Titol, string? Descripcio, List<int>? RecursIds = null);
+
+public record SetSessioRecursosRequest(List<int> RecursIds);
 
 public record MissatgeRequest(string Text);
 
