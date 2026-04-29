@@ -1,0 +1,347 @@
+@page "/admin/xarxa"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject UserStateService UserState
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<SharedResources> Loc
+
+<PageTitle>Control de xarxa – Entorn d'Examens</PageTitle>
+@if (!UserState.IsAdmin) { Nav.NavigateTo("/"); return; }
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
+    <MudButton StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/professor/dashboard"
+               Variant="Variant.Text" Color="Color.Default">
+        @Loc["Nav_Dashboard"]
+    </MudButton>
+    <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+    <MudIcon Icon="@Icons.Material.Filled.Dns" Color="Color.Primary" Class="mr-1" />
+    <MudText Typo="Typo.h5" Style="font-weight:700">Control de xarxa</MudText>
+</MudStack>
+
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    Gestió del bloqueig de dominis DNS (BIND9) i intercepció de consultes DNS externes.
+    Els canvis <strong>generen fitxers de configuració</strong> al volum <code>net-control</code>
+    que el script del servidor aplica automàticament.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+
+<MudGrid Spacing="3">
+
+    <!-- ── Estat del sistema ───────────────────────────────────── -->
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="@(_status?.BindDisponible == true ? Color.Success : Color.Warning)"
+                               Variant="Variant.Filled" Size="Size.Small">
+                        <MudIcon Icon="@Icons.Material.Filled.Sensors" />
+                    </MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Estat</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_status is null)
+                {
+                    <MudText Color="Color.Secondary">Carregant...</MudText>
+                }
+                else
+                {
+                    <MudStack Spacing="2">
+                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                            <MudIcon Icon="@(_status.BindDisponible
+                                ? Icons.Material.Filled.CheckCircle
+                                : Icons.Material.Filled.Warning)"
+                                Color="@(_status.BindDisponible ? Color.Success : Color.Warning)"
+                                Size="Size.Small" />
+                            <MudText Typo="Typo.body2">
+                                Volum net-control: @(_status.BindDisponible ? "disponible" : "no disponible")
+                            </MudText>
+                        </MudStack>
+                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                            <MudIcon Icon="@(_status.DnsInterceptActiu
+                                ? Icons.Material.Filled.Block
+                                : Icons.Material.Filled.RadioButtonUnchecked)"
+                                Color="@(_status.DnsInterceptActiu ? Color.Error : Color.Default)"
+                                Size="Size.Small" />
+                            <MudText Typo="Typo.body2">
+                                Intercepció DNS: @(_status.DnsInterceptActiu ? "ACTIVA" : "inactiva")
+                            </MudText>
+                        </MudStack>
+                        <MudText Typo="Typo.body2">
+                            Dominis blocats actius: <strong>@_status.DominisBlocats</strong>
+                        </MudText>
+                        @if (_status.UltimaAplicacio.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Última aplicació: @_status.UltimaAplicacio.Value.ToLocalTime().ToString("dd/MM HH:mm")
+                            </MudText>
+                        }
+                    </MudStack>
+                }
+            </MudCardContent>
+        </MudCard>
+
+        <!-- ── Intercepció DNS ─────────────────────────────── -->
+        <MudCard Elevation="2" Class="mt-3">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Error" Variant="Variant.Filled" Size="Size.Small">
+                        <MudIcon Icon="@Icons.Material.Filled.Security" />
+                    </MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Intercepció DNS</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Redirigeix 8.8.8.8 / 1.1.1.1 → BIND9 local
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Class="mb-3">
+                    Quan s'activa, el script al servidor afegeix regles iptables DNAT
+                    per interceptar totes les consultes DNS externes i forçar-les
+                    a través del BIND9 local (que aplica el bloqueig de dominis).
+                </MudText>
+                <MudSwitch T="bool"
+                           Value="@(_status?.DnsInterceptActiu ?? false)"
+                           ValueChanged="@(v => SetDnsIntercept(v))"
+                           Color="Color.Error"
+                           Label="@(_status?.DnsInterceptActiu == true ? "Intercepció ACTIVA" : "Intercepció inactiva")"
+                           Disabled="_applying" />
+            </MudCardContent>
+        </MudCard>
+
+        <!-- ── Script host ────────────────────────────────── -->
+        <MudCard Elevation="2" Class="mt-3">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Script al servidor</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                    Executa al servidor per activar el monitoratge automàtic:
+                </MudText>
+                <MudPaper Elevation="0" Style="background:#0d1117;padding:.75rem;border-radius:6px">
+                    <MudText Typo="Typo.caption" Style="font-family:monospace;color:#e6edf3;white-space:pre">
+sudo bash /docker/EntornExamen/scripts/examen/watch-net-control.sh &</MudText>
+                </MudPaper>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- ── Dominis blocats ─────────────────────────────────────── -->
+    <MudItem xs="12" md="8">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Error" Variant="Variant.Filled" Size="Size.Small">
+                        <MudIcon Icon="@Icons.Material.Filled.Block" />
+                    </MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Dominis blocats</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        BIND9 retorna l'IP del servidor per a consultes d'aquests dominis
+                    </MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudButton Variant="Variant.Filled" Color="Color.Error"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="() => _mostrarAfegir = true">
+                        Afegir domini
+                    </MudButton>
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_dominis.Count == 0 && !_loading)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">
+                        Encara no hi ha dominis blocats.
+                        Afegeix dominis com <strong>google.com</strong>, <strong>youtube.com</strong>, etc.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudTable Items="_dominis" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Domini</MudTh>
+                            <MudTh>Nota</MudTh>
+                            <MudTh Style="width:80px">Actiu</MudTh>
+                            <MudTh Style="width:80px"></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <MudText Typo="Typo.body2" Style="font-family:monospace">
+                                    @context.Domini
+                                </MudText>
+                            </MudTd>
+                            <MudTd>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @context.Nota
+                                </MudText>
+                            </MudTd>
+                            <MudTd>
+                                <MudSwitch T="bool"
+                                           Value="@context.Actiu"
+                                           ValueChanged="@(v => ToggleDomini(context.Id))"
+                                           Color="Color.Success" Dense="true" />
+                            </MudTd>
+                            <MudTd>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small" Color="Color.Error"
+                                               OnClick="() => EliminarDomini(context.Id)" />
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+
+                <MudStack Row="true" Spacing="2" Class="mt-3" JustifyContent="Justify.FlexEnd">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.PublishedWithChanges"
+                               OnClick="AplicarCanvis" Disabled="_applying">
+                        @if (_applying) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                        Generar i aplicar fitxers
+                    </MudButton>
+                </MudStack>
+
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+                    Clica <strong>Generar i aplicar fitxers</strong> per escriure la configuració al volum.
+                    El script <code>watch-net-control.sh</code> al servidor la detectarà i recarregarà BIND9 automàticament.
+                </MudAlert>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<!-- Diàleg afegir domini -->
+<MudDialog @bind-Visible="_mostrarAfegir">
+    <TitleContent>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.Block" Color="Color.Error" />
+            <MudText Typo="Typo.h6">Afegir domini a blocar</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_nouDomini" Label="Domini (p.ex. google.com)"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Block"
+                          HelperText="El domini i tots els subdominis quedaran bloquejats" />
+            <MudTextField @bind-Value="_novaNota" Label="Nota descriptiva (opcional)"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _mostrarAfegir = false">@Loc["Action_Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error"
+                   OnClick="AfegirDomini" Disabled="_applying">
+            Blocar domini
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private NetControlStatusDto? _status;
+    private List<DominiBloquejatDto> _dominis = [];
+    private bool _loading  = true;
+    private bool _applying = false;
+    private bool _mostrarAfegir;
+    private string _nouDomini = "";
+    private string _novaNota  = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserState.IsAdmin) return;
+        Api.SetToken(UserState.Token!);
+        await Carregar();
+    }
+
+    private async Task Carregar()
+    {
+        _loading = true;
+        var t1 = Api.GetNetControlStatusAsync();
+        var t2 = Api.GetDominisBlocatsAsync();
+        await Task.WhenAll(t1, t2);
+        _status  = t1.Result;
+        _dominis = t2.Result ?? [];
+        _loading = false;
+    }
+
+    private async Task AfegirDomini()
+    {
+        if (string.IsNullOrWhiteSpace(_nouDomini)) return;
+        _applying = true;
+        var dto = await Api.AfegirDominiAsync(new CreateDominiRequest(_nouDomini.Trim(), _novaNota.Trim() is "" ? null : _novaNota.Trim()));
+        _applying = false;
+        if (dto is not null)
+        {
+            _dominis.Add(dto);
+            _dominis = [.. _dominis.OrderBy(d => d.Domini)];
+            _mostrarAfegir = false;
+            _nouDomini = "";
+            _novaNota  = "";
+            Snackbar.Add($"Domini '{dto.Domini}' afegit.", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("El domini ja existeix o no és vàlid.", Severity.Warning);
+        }
+    }
+
+    private async Task EliminarDomini(int id)
+    {
+        var ok = await Api.EliminarDominiAsync(id);
+        if (ok)
+        {
+            _dominis.RemoveAll(d => d.Id == id);
+            Snackbar.Add("Domini eliminat.", Severity.Success);
+        }
+        else Snackbar.Add("Error eliminant el domini.", Severity.Error);
+    }
+
+    private async Task ToggleDomini(int id)
+    {
+        var ok = await Api.ToggleDominiAsync(id);
+        if (ok)
+        {
+            var d = _dominis.FirstOrDefault(x => x.Id == id);
+            if (d is not null)
+                _dominis[_dominis.IndexOf(d)] = d with { Actiu = !d.Actiu };
+        }
+    }
+
+    private async Task AplicarCanvis()
+    {
+        _applying = true;
+        var ok = await Api.AplicarNetControlAsync();
+        _applying = false;
+        if (ok)
+        {
+            Snackbar.Add("Fitxers de configuració generats. El script del servidor els aplicarà.", Severity.Success);
+            await Carregar();
+        }
+        else Snackbar.Add("Error generant els fitxers.", Severity.Error);
+    }
+
+    private async Task SetDnsIntercept(bool actiu)
+    {
+        _applying = true;
+        var ok = await Api.SetDnsInterceptAsync(actiu);
+        _applying = false;
+        if (ok)
+        {
+            Snackbar.Add(actiu ? "Intercepció DNS activada." : "Intercepció DNS desactivada.", Severity.Info);
+            await Carregar();
+        }
+        else Snackbar.Add("Error modificant la intercepció DNS.", Severity.Error);
+    }
+}

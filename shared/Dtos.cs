@@ -195,6 +195,24 @@ public record DiagnosticFitxer(
 public record DiagnosticBd(
     int SessionsActives, int RegistresActius, DateTime? UltimCheckin);
 
+// ─── Logs Docker ─────────────────────────────────────────────────────────────
+public record DockerLogLineDto(string Stream, string Timestamp, string Message);
+public record DockerLogsResponse(
+    string Container,
+    List<DockerLogLineDto> Lines,
+    bool Available,
+    string? Error = null);
+
+// ─── Control de xarxa (BIND9 + iptables) ─────────────────────────────────────
+public record DominiBloquejatDto(int Id, string Domini, string? Nota, bool Actiu, DateTime CreatedAt);
+public record CreateDominiRequest(string Domini, string? Nota = null);
+public record NetControlStatusDto(
+    bool BindDisponible,
+    bool DnsInterceptActiu,
+    int DominisBlocats,
+    DateTime? UltimaAplicacio,
+    string? Error);
+
 // ─── Events SignalR (publicats per Redis) ─────────────────────────────────────
 public record ExamenEventAlumne(
     int? StudentId, string? Nom, string? Cognoms,

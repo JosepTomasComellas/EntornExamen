@@ -9,6 +9,7 @@ volumes:
   api-backups:   # Còpies de seguretat JSON (exportació/importació)
   fotos-alumnes: # Fotos d'alumnes per a l'Entorn Examen
   nginx-logs:    # Logs JSON d'accés nginx, compartit amb l'API per a estadístiques de tràfic
+  net-control:   # Fitxers de control DNS/iptables compartits amb l'host via script watch
 
 services:
 
@@ -95,6 +96,8 @@ services:
       Examen__DnsLogPath:             "/data/dns-queries.log"
       Examen__NginxLogPath:           "/data/nginx/access.log"
       Examen__WebWwwrootPath:         "/app/wwwroot"
+      NetControl__Path:               "/data/net-control"
+      NetControl__RedirectIp:         "${EXAMEN_SERVER_IP:-192.168.100.1}"
     expose:
       - "8080"
     volumes:
@@ -103,6 +106,8 @@ services:
       - /var/lib/dhcp/dhcpd.leases:/data/dhcpd.leases:ro
       - /var/log/named/queries.log:/data/dns-queries.log:ro
       - nginx-logs:/data/nginx:ro
+      - net-control:/data/net-control
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - entornexamen-net
     depends_on:

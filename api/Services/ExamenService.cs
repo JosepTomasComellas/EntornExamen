@@ -1081,6 +1081,24 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
 
         sessio.MostrarRecursos = recursIds.Count > 0;
         await db.SaveChangesAsync();
+
+        // Notifica en temps real a tots els alumnes actius de la sessió
+        var recursosActuals = await db.SessioExamenRecursos
+            .Where(sr => sr.SessioId == sessioId)
+            .Join(db.RecursosExamen, sr => sr.RecursId, r => r.Id,
+                (sr, r) => new RecursExamenDto(r.Id, r.Icona, r.Etiqueta, r.Url, r.Ordre))
+            .OrderBy(r => r.Ordre)
+            .ToListAsync();
+
+        var studentIds = await db.RegistresConnexio
+            .Where(r => r.SessioId == sessioId && r.StudentId != null && r.DesconnectatAt == null)
+            .Select(r => r.StudentId!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        foreach (var sid in studentIds)
+            await hub.NotificaRecursosActualitzatsAsync(sid, recursosActuals);
+
         return true;
     }
 }

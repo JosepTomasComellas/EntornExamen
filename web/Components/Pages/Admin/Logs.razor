@@ -1,0 +1,171 @@
+@page "/admin/logs"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject UserStateService UserState
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<SharedResources> Loc
+
+<PageTitle>Logs – Entorn d'Examens</PageTitle>
+@if (!UserState.IsAdmin) { Nav.NavigateTo("/"); return; }
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
+    <MudButton StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/professor/dashboard"
+               Variant="Variant.Text" Color="Color.Default">
+        @Loc["Nav_Dashboard"]
+    </MudButton>
+    <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+    <MudIcon Icon="@Icons.Material.Filled.Terminal" Color="Color.Primary" Class="mr-1" />
+    <MudText Typo="Typo.h5" Style="font-weight:700">Logs Docker</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Refresh"
+               OnClick="Carregar" Disabled="_loading">
+        Actualitzar
+    </MudButton>
+</MudStack>
+
+<!-- Selectors -->
+<MudPaper Elevation="1" Class="pa-3 mb-4">
+    <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="3" AlignItems="AlignItems.Center">
+        <MudSelect T="string" @bind-Value="_container" Label="Contenidor"
+                   Variant="Variant.Outlined" Style="min-width:260px" Dense="true">
+            @foreach (var c in _containers)
+            {
+                <MudSelectItem Value="@c">@c</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="int" @bind-Value="_lines" Label="Línies"
+                   Variant="Variant.Outlined" Style="min-width:120px" Dense="true">
+            <MudSelectItem Value="50">50</MudSelectItem>
+            <MudSelectItem Value="100">100</MudSelectItem>
+            <MudSelectItem Value="200">200</MudSelectItem>
+            <MudSelectItem Value="500">500</MudSelectItem>
+        </MudSelect>
+        <MudCheckBox T="bool" @bind-Value="_autoRefresh" Label="Auto-refresc (10s)" />
+    </MudStack>
+</MudPaper>
+
+@if (!_dockerAvailable)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4">
+        <strong>Docker socket no disponible.</strong> Per activar el visor de logs,
+        assegura't que el fitxer <code>/var/run/docker.sock</code> existeix al servidor
+        i que el servei <code>api</code> del docker-compose té el muntatge:
+        <br/><code>- /var/run/docker.sock:/var/run/docker.sock:ro</code>
+    </MudAlert>
+}
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2" />
+}
+else if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+
+@if (_logLines is not null)
+{
+    <MudPaper Elevation="2" Style="background:#0d1117;border-radius:8px;overflow:hidden">
+        <div style="padding:.5rem 1rem;background:#161b22;display:flex;align-items:center;gap:1rem">
+            <MudText Typo="Typo.caption" Style="color:#8b949e;font-family:monospace">
+                @_container · @_logLines.Count línies
+            </MudText>
+            <MudSpacer />
+            <MudText Typo="Typo.caption" Style="color:#8b949e">
+                @_ultimaActualitzacio.ToLocalTime().ToString("HH:mm:ss")
+            </MudText>
+        </div>
+        <div style="overflow-y:auto;max-height:70vh;padding:.75rem 1rem;font-family:monospace;font-size:.78rem;line-height:1.6">
+            @foreach (var line in _logLines)
+            {
+                var color = line.Stream == "stderr" ? "#ff7b72" : "#e6edf3";
+                var prefix = line.Stream == "stderr" ? "ERR" : "OUT";
+                <div style="color:@color;white-space:pre-wrap;word-break:break-all">
+                    @if (!string.IsNullOrEmpty(line.Timestamp))
+                    {
+                        <span style="color:#8b949e;margin-right:.5rem">@FormatTs(line.Timestamp)</span>
+                    }
+                    <span style="color:@(line.Stream == "stderr" ? "#ff7b72" : "#7ee787");margin-right:.5rem;font-size:.7rem">[@prefix]</span>@line.Message
+                </div>
+            }
+            @if (_logLines.Count == 0)
+            {
+                <MudText Style="color:#8b949e">Cap línia de log disponible.</MudText>
+            }
+        </div>
+    </MudPaper>
+}
+
+@code {
+    private static readonly string[] _containers =
+    [
+        "entornexamen-api", "entornexamen-web",
+        "entornexamen-nginx", "entornexamen-db", "entornexamen-redis"
+    ];
+
+    private string _container = "entornexamen-api";
+    private int    _lines     = 200;
+    private bool   _autoRefresh;
+    private bool   _loading;
+    private bool   _dockerAvailable = true;
+    private string? _error;
+    private List<DockerLogLineDto>? _logLines;
+    private DateTime _ultimaActualitzacio;
+    private System.Threading.Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserState.IsAdmin) return;
+        Api.SetToken(UserState.Token!);
+        await Carregar();
+    }
+
+    private async Task Carregar()
+    {
+        _loading = true;
+        _error   = null;
+        StateHasChanged();
+
+        var resp = await Api.GetDockerLogsAsync(_container, _lines);
+
+        _loading = false;
+        if (resp is null)
+        {
+            _error = "Error de comunicació amb l'API.";
+        }
+        else
+        {
+            _dockerAvailable = resp.Available || resp.Error?.Contains("socket") == true;
+            if (!resp.Available)
+                _error = resp.Error;
+            else
+                _logLines = resp.Lines;
+            _ultimaActualitzacio = DateTime.UtcNow;
+        }
+
+        if (_autoRefresh && _timer is null)
+            _timer = new System.Threading.Timer(
+                async _ => { await InvokeAsync(Carregar); },
+                null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+        else if (!_autoRefresh)
+        {
+            _timer?.Dispose();
+            _timer = null;
+        }
+    }
+
+    private static string FormatTs(string iso)
+    {
+        if (DateTime.TryParse(iso, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+            return dt.ToLocalTime().ToString("HH:mm:ss.fff");
+        return iso.Length > 19 ? iso[11..19] : iso;
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

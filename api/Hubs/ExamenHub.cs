@@ -51,6 +51,9 @@ public class ExamenHub(IConnectionMultiplexer redis)
     public Task NotificaAlumneExpulsatAsync(int studentId) =>
         PublicarAsync(CanalAlumne(studentId), "AlumneExpulsat", new { });
 
+    public Task NotificaRecursosActualitzatsAsync(int studentId, List<RecursExamenDto> recursos) =>
+        PublicarAsync(CanalAlumne(studentId), "RecursosActualitzats", recursos);
+
     // ── Publicació a tots els alumnes d'una sessió (via canal sessió) ──────────
     public Task NotificaSessioTancadaGlobalAsync(int sessioId) =>
         PublicarAsync(CanalSessio(sessioId), "SessioTancadaGlobal", new { });

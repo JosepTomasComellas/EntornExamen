@@ -50,6 +50,8 @@ builder.Services.AddScoped<IClassService,     ClassService>();
 builder.Services.AddScoped<IEmailService,     EmailService>();
 builder.Services.AddScoped<IBackupService,    BackupService>();
 builder.Services.AddScoped<IExamenService,    ExamenService>();
+builder.Services.AddScoped<IBindService,      BindService>();
+builder.Services.AddScoped<IDockerLogService, DockerLogService>();
 
 // Capçaleres de proxy nginx (Docker): accepta X-Forwarded-For de qualsevol proxy intern
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -249,6 +251,19 @@ using (var scope = app.Services.CreateScope())
                 CONSTRAINT [FK_SessioExamenRecursos_RecursosExamen]
                     FOREIGN KEY ([RecursId]) REFERENCES [RecursosExamen]([Id]) ON DELETE CASCADE
             );
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'DominisBlocats')
+        BEGIN
+            CREATE TABLE [DominisBlocats] (
+                [Id]        INT           NOT NULL IDENTITY(1,1),
+                [Domini]    NVARCHAR(253) NOT NULL,
+                [Nota]      NVARCHAR(500) NULL,
+                [Actiu]     BIT           NOT NULL DEFAULT 1,
+                [CreatedAt] DATETIME2     NOT NULL DEFAULT GETUTCDATE(),
+                CONSTRAINT [PK_DominisBlocats] PRIMARY KEY ([Id])
+            );
+            CREATE UNIQUE INDEX [IX_DominisBlocats_Domini] ON [DominisBlocats] ([Domini]);
         END
         """);
 
@@ -1065,6 +1080,74 @@ app.MapPut("/api/examen/sessions/{id:int}/recursos", async (int id, SetSessioRec
     if (!IsProfessor(user)) return Results.Forbid();
     var ok = await svc.SetSessioRecursosAsync(id, req.RecursIds, GetUserId(user), IsAdmin(user));
     return ok ? Results.NoContent() : Results.NotFound();
+}).RequireAuthorization();
+
+// ── Logs Docker (admin) ───────────────────────────────────────────────────────
+
+app.MapGet("/api/admin/logs", async (
+    string container, int lines, IDockerLogService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    var result = await svc.GetLogsAsync(container, lines <= 0 ? 200 : lines);
+    return Results.Ok(result);
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/logs/disponible", (IDockerLogService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    return Results.Ok(new { Available = svc.IsAvailable() });
+}).RequireAuthorization();
+
+// ── Control de xarxa: BIND9 + DNS intercept (admin) ──────────────────────────
+
+app.MapGet("/api/admin/net-control/status", async (IBindService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    return Results.Ok(await svc.GetStatusAsync());
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/net-control/dominis", async (IBindService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    return Results.Ok(await svc.GetDominisAsync());
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/net-control/dominis", async (
+    CreateDominiRequest req, IBindService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    var dto = await svc.AfegirDominiAsync(req.Domini, req.Nota);
+    return dto is null ? Results.Conflict("Domini ja existent o invàlid.") : Results.Ok(dto);
+}).RequireAuthorization();
+
+app.MapDelete("/api/admin/net-control/dominis/{id:int}", async (
+    int id, IBindService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    return await svc.EliminarDominiAsync(id) ? Results.NoContent() : Results.NotFound();
+}).RequireAuthorization();
+
+app.MapPut("/api/admin/net-control/dominis/{id:int}/toggle", async (
+    int id, IBindService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    return await svc.ToggleActiuAsync(id) ? Results.NoContent() : Results.NotFound();
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/net-control/aplicar", async (IBindService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    var (ok, error) = await svc.AplicarCanavisAsync();
+    return ok ? Results.Ok(new { Message = "Fitxers generats. Executa el script al servidor." })
+              : Results.Problem(error);
+}).RequireAuthorization();
+
+app.MapPut("/api/admin/net-control/dns-intercept", async (
+    bool actiu, IBindService svc, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    var (ok, error) = await svc.SetDnsInterceptAsync(actiu);
+    return ok ? Results.NoContent() : Results.Problem(error);
 }).RequireAuthorization();
 
 app.Run();

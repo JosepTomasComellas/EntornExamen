@@ -65,6 +65,8 @@ public class ExamenRedisSubscriber(
                     JsonSerializer.Deserialize<ExamenEventDns>(dataJson, _json)!,
                 "MissatgeActualitzat" or "MissatgeProfessor" =>
                     JsonSerializer.Deserialize<ExamenEventMissatge>(dataJson, _json)!,
+                "RecursosActualitzats" =>
+                    JsonSerializer.Deserialize<List<RecursExamenDto>>(dataJson, _json) ?? new(),
                 _ => new object()
             };
 

@@ -359,6 +359,32 @@ public class ApiClient
         catch { return (null, "Error desconegut."); }
     }
 
+    // ── Logs Docker ──────────────────────────────────────────────────────────
+    public Task<DockerLogsResponse?> GetDockerLogsAsync(string container, int lines = 200) =>
+        GetAsync<DockerLogsResponse>($"/api/admin/logs?container={Uri.EscapeDataString(container)}&lines={lines}");
+
+    // ── Control de xarxa ─────────────────────────────────────────────────────
+    public Task<NetControlStatusDto?> GetNetControlStatusAsync() =>
+        GetAsync<NetControlStatusDto>("/api/admin/net-control/status");
+
+    public Task<List<DominiBloquejatDto>?> GetDominisBlocatsAsync() =>
+        GetAsync<List<DominiBloquejatDto>>("/api/admin/net-control/dominis");
+
+    public Task<DominiBloquejatDto?> AfegirDominiAsync(CreateDominiRequest req) =>
+        PostAsync<DominiBloquejatDto>("/api/admin/net-control/dominis", req);
+
+    public Task<bool> EliminarDominiAsync(int id) =>
+        DeleteAsync($"/api/admin/net-control/dominis/{id}");
+
+    public Task<bool> ToggleDominiAsync(int id) =>
+        PutNoContentAsync($"/api/admin/net-control/dominis/{id}/toggle", null);
+
+    public Task<bool> AplicarNetControlAsync() =>
+        PostNoContentAsync("/api/admin/net-control/aplicar", null);
+
+    public Task<bool> SetDnsInterceptAsync(bool actiu) =>
+        PutNoContentAsync($"/api/admin/net-control/dns-intercept?actiu={actiu}", null);
+
     // ── Privats ───────────────────────────────────────────────────────────────
 
     private void CheckUnauthorized(HttpResponseMessage resp)

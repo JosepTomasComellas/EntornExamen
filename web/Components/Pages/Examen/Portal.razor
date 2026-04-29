@@ -369,6 +369,13 @@
                     _mostrarExpulsat = true;
                     await InvokeAsync(StateHasChanged);
                     break;
+                case "RecursosActualitzats" when data is List<RecursExamenDto> recursos:
+                    if (_checkinResp is not null)
+                        _checkinResp = _checkinResp with {
+                            Sessio = _checkinResp.Sessio with { Recursos = recursos }
+                        };
+                    await InvokeAsync(StateHasChanged);
+                    break;
             }
         };
         ExamenNotif.SubscriuAlumne(studentId, _alumneHandler);

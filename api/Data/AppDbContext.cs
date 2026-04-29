@@ -13,8 +13,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<SessioExamen>      SessionsExamen    => Set<SessioExamen>();
     public DbSet<RegistreConnexio>  RegistresConnexio => Set<RegistreConnexio>();
     public DbSet<PeticioTdns>       PeticiosDns       => Set<PeticioTdns>();
-    public DbSet<RecursExamen>      RecursosExamen        => Set<RecursExamen>();
-    public DbSet<SessioExamenRecurs> SessioExamenRecursos => Set<SessioExamenRecurs>();
+    public DbSet<RecursExamen>       RecursosExamen        => Set<RecursExamen>();
+    public DbSet<SessioExamenRecurs> SessioExamenRecursos  => Set<SessioExamenRecurs>();
+    public DbSet<DominiBloquejat>    DominisBlocats        => Set<DominiBloquejat>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
