@@ -137,21 +137,21 @@
                     {
                         <MudDivider Class="mb-3" />
                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2 d-block"
-                                 Style="text-transform:uppercase;letter-spacing:.05em;font-weight:600">
+                                 Style="text-transform:uppercase;letter-spacing:.05em;font-weight:600;text-align:center">
                             Recursos
                         </MudText>
-                        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2" Class="mb-3">
+                        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin-bottom:.75rem">
                             @foreach (var recurs in _checkinResp.Sessio.Recursos.OrderBy(r => r.Ordre))
                             {
-                                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                           StartIcon="@($"@Icons.Material.Filled.{recurs.Icona}")"
-                                           Size="Size.Small"
-                                           Href="@recurs.Url" Target="_blank"
-                                           Rel="noopener noreferrer">
-                                    @recurs.Etiqueta
-                                </MudButton>
+                                <MudTooltip Text="@recurs.Etiqueta" Placement="Placement.Top">
+                                    <MudIconButton Icon="@IconaMatIcon(recurs.Icona)"
+                                                   Color="Color.Primary"
+                                                   Variant="Variant.Outlined"
+                                                   Size="Size.Large"
+                                                   Href="@recurs.Url" Target="_blank" />
+                                </MudTooltip>
                             }
-                        </MudStack>
+                        </div>
                         <MudDivider Class="mb-3" />
                     }
 
@@ -244,6 +244,13 @@
 </MudDialog>
 
 @code {
+    private static string IconaMatIcon(string nom)
+    {
+        var prop = typeof(Icons.Material.Filled).GetProperty(nom,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        return prop?.GetValue(null) as string ?? Icons.Material.Filled.Link;
+    }
+
     private enum Fase { Email, Connectat }
 
     private int CheckinInterval => _checkinResp?.Sessio.IntervalSegons ?? 30;

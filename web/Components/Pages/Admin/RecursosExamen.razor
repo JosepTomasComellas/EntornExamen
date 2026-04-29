@@ -57,7 +57,7 @@ else
                 <MudTd>@context.Ordre</MudTd>
                 <MudTd>
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                        <MudIcon Icon="@($"@Icons.Material.Filled.{context.Icona}")"
+                        <MudIcon Icon="@IconaMatIcon(context.Icona)"
                                  Size="Size.Small" Color="Color.Primary" />
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Icona</MudText>
                     </MudStack>
@@ -100,7 +100,7 @@ else
                 {
                     <MudSelectItem T="string" Value="@icona.Nom">
                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <MudIcon Icon="@($"@Icons.Material.Filled.{icona.Nom}")"
+                            <MudIcon Icon="@IconaMatIcon(icona.Nom)"
                                      Size="Size.Small" />
                             <span>@icona.Etiqueta</span>
                         </MudStack>
@@ -125,11 +125,11 @@ else
             {
                 <MudPaper Elevation="0" Class="pa-3" Style="background:var(--mud-palette-background-grey)">
                     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">Previsualització:</MudText>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                               StartIcon="@($"@Icons.Material.Filled.{_formIcona}")"
-                               Size="Size.Medium" Disabled="true">
-                        @_formEtiqueta
-                    </MudButton>
+                    <MudTooltip Text="@_formEtiqueta" Placement="Placement.Top">
+                        <MudIconButton Icon="@IconaMatIcon(_formIcona)"
+                                       Variant="Variant.Outlined" Color="Color.Primary"
+                                       Size="Size.Large" Disabled="true" />
+                    </MudTooltip>
                 </MudPaper>
             }
         </MudStack>
@@ -148,6 +148,13 @@ else
 </MudDialog>
 
 @code {
+    private static string IconaMatIcon(string nom)
+    {
+        var prop = typeof(Icons.Material.Filled).GetProperty(nom,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        return prop?.GetValue(null) as string ?? Icons.Material.Filled.Link;
+    }
+
     private record IconaItem(string Nom, string Etiqueta);
 
     private static readonly List<IconaItem> _iconesDisponibles =
