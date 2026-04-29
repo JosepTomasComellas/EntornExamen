@@ -240,6 +240,12 @@ using (var scope = app.Services.CreateScope())
             ALTER TABLE [SessionsExamen] ADD [MostrarRecursos] BIT NOT NULL DEFAULT 0;
         END
 
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                       WHERE TABLE_NAME = 'SessionsExamen' AND COLUMN_NAME = 'GatewayIp')
+        BEGIN
+            ALTER TABLE [SessionsExamen] ADD [GatewayIp] NVARCHAR(45) NULL;
+        END
+
         IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'SessioExamenRecursos')
         BEGIN
             CREATE TABLE [SessioExamenRecursos] (

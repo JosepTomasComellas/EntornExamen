@@ -122,6 +122,22 @@ public class BindService(AppDbContext db, IConfiguration cfg, ILogger<BindServic
                 """;
             await File.WriteAllTextAsync(Path.Combine(NetControlPath, "blocked-zone.db"), zoneDb);
 
+            // ── gateway-rules ─────────────────────────────────────────────────
+            // Format per línia: IP_ALUMNE GATEWAY_IP
+            var sessionsGateway = await db.SessionsExamen
+                .Where(s => s.Activa && s.GatewayIp != null)
+                .Include(s => s.Registres)
+                .ToListAsync();
+
+            var gwSb = new StringBuilder();
+            gwSb.AppendLine($"# EntornExamen — gateway-rules auto-generades {DateTime.UtcNow:O}");
+            foreach (var s in sessionsGateway)
+            {
+                foreach (var r in s.Registres.Where(r => r.IpAssignada != null && r.DesconnectatAt == null))
+                    gwSb.AppendLine($"{r.IpAssignada} {s.GatewayIp}");
+            }
+            await File.WriteAllTextAsync(Path.Combine(NetControlPath, "gateway-rules"), gwSb.ToString());
+
             // ── reload-trigger ────────────────────────────────────────────────
             await File.WriteAllTextAsync(Path.Combine(NetControlPath, "reload-trigger"),
                 DateTime.UtcNow.ToString("O"));

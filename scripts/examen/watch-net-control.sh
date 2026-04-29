@@ -1,13 +1,14 @@
 #!/bin/bash
 # =============================================================================
-# EntornExamen — Monitor de control de xarxa (BIND9 + iptables)
+# EntornExamen — Monitor de control de xarxa (BIND9 + iptables + policy routing)
 # Executa com a root al servidor: sudo bash watch-net-control.sh
 #
 # Llegeix els fitxers del volum Docker net-control i aplica:
 #   1. Zones BIND9 blocades   (blocked-zones.conf + blocked-zone.db)
 #   2. Intercepció DNS iptables (dns-intercept: 1=actiu, 0=inactiu)
+#   3. Policy routing per gateway per alumne (gateway-rules: IP_ALUMNE GATEWAY)
 #
-# Requisits: inotifywait (apt install inotify-tools), bind9, iptables
+# Requisits: inotifywait (apt install inotify-tools), bind9, iptables, iproute2
 # =============================================================================
 
 set -euo pipefail
@@ -99,6 +100,32 @@ aplicar() {
             ok "Intercepció DNS activada (interfície: $DNS_INTERCEPT_IFACE → $SERVER_IP)"
         else
             ok "Intercepció DNS desactivada"
+        fi
+    fi
+
+    # Policy routing per gateway per alumne
+    # Taula 200: una ruta per defecte per cada alumne amb gateway específic
+    if [[ -f "$src/gateway-rules" ]]; then
+        # Neteja regles anteriors de la taula 200
+        while ip rule | grep -q "lookup 200"; do
+            local rule_src
+            rule_src=$(ip rule | grep "lookup 200" | head -1 | awk '{print $3}')
+            ip rule del from "$rule_src" table 200 2>/dev/null || break
+        done
+        ip route flush table 200 2>/dev/null || true
+
+        local gw_count=0
+        while IFS=' ' read -r student_ip gateway_ip; do
+            [[ -z "$student_ip" || "$student_ip" == \#* ]] && continue
+            ip route add default via "$gateway_ip" table 200 2>/dev/null || true
+            ip rule add from "$student_ip" table 200 prio 200 2>/dev/null || true
+            (( gw_count++ )) || true
+        done < "$src/gateway-rules"
+
+        if (( gw_count > 0 )); then
+            ok "Policy routing aplicat: $gw_count alumnes amb gateway personalitzat"
+        else
+            ok "Policy routing: cap alumne amb gateway personalitzat"
         fi
     fi
 

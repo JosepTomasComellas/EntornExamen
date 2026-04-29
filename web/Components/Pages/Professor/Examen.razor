@@ -657,6 +657,10 @@
             <MudTextField @bind-Value="_novaDescripcio"
                           Label="@Loc["Examen_Instructions"]"
                           Variant="Variant.Outlined" Lines="3" />
+            <MudTextField @bind-Value="_novaGatewayIp"
+                          Label="IP del gateway (opcional)"
+                          Placeholder="p. ex. 192.168.100.1"
+                          Variant="Variant.Outlined" />
             @if (_recursosDisponibles.Count > 0)
             {
                 <MudText Typo="Typo.body2">Recursos que es mostraran als alumnes:</MudText>
@@ -780,6 +784,7 @@
     private int     _novaClasseId;
     private string  _novaTitol      = "";
     private string  _novaDescripcio = "";
+    private string  _novaGatewayIp  = "";
     private HashSet<int> _novaRecursIds  = [];
     private HashSet<int> _sessioRecursIds = [];
     private List<RecursExamenDto> _recursosDisponibles = [];
@@ -997,13 +1002,14 @@
         }
         _carregant = true;
         var (sessio, error) = await Api.CreateExamenSessioAsync(
-            new CreateSessioRequest(_novaClasseId, _novaTitol, _novaDescripcio, [.. _novaRecursIds]));
+            new CreateSessioRequest(_novaClasseId, _novaTitol, _novaDescripcio, [.. _novaRecursIds],
+                string.IsNullOrWhiteSpace(_novaGatewayIp) ? null : _novaGatewayIp));
         _carregant = false;
 
         if (error is not null) { _errorNovaSessio = error; return; }
 
         _mostrarDialegNovaSessio = false;
-        _novaTitol = ""; _novaDescripcio = ""; _novaClasseId = 0; _novaRecursIds = [];
+        _novaTitol = ""; _novaDescripcio = ""; _novaClasseId = 0; _novaRecursIds = []; _novaGatewayIp = "";
         _sessions = await Api.GetExamenSessionsAsync() ?? [];
         if (sessio is not null)
             await SeleccionarSessio(sessio.Id);

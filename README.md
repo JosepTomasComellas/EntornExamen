@@ -1,4 +1,4 @@
-# EntornExamen · v3.3.0
+# EntornExamen · v3.5.0
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 Branding, colors, logo i xarxa DHCP configurables des del `.env`.
@@ -58,6 +58,8 @@ A partir d'aquí, fa check-in cada 30 s i el professor veu l'estat de tota la cl
 - Còpies automàtiques al servidor en format ZIP
 - Estadístiques d'accessos de professors
 - Gestió de dispositius registrats (`/admin/examen-macs`)
+- Visor de logs Docker en temps real (`/admin/logs`)
+- Control de xarxa: bloqueig DNS per domini (BIND9 + zones auto-generades) i intercepció DNS via iptables (`/admin/control-xarxa`)
 
 ---
 
@@ -252,12 +254,14 @@ EntornExamen/
 │   ├── Dtos.cs                      # Tots els DTOs compartits
 │   └── AppVersion.cs                # Versió actual
 ├── EntornExamen.Tests/
-│   └── ExamenServiceTests.cs        # Tests unitaris ExamenService
-├── scripts/examen/               # Configuració DHCP + DNS
+│   ├── ExamenServiceTests.cs        # Tests unitaris ExamenService
+│   └── BindServiceTests.cs          # Tests unitaris BindService (CRUD + generació fitxers)
+├── scripts/examen/               # Configuració DHCP + DNS + control xarxa
 │   ├── dhcp-hook.sh
 │   ├── dhcpd.conf
 │   ├── named.conf.local
-│   └── db.examen.local
+│   ├── db.examen.local
+│   └── watch-net-control.sh         # Daemon host: aplica BIND9 + iptables + policy routing
 ├── nginx/                        # Proxy invers SSL
 ├── deploy/                       # Scripts de desplegament
 │   └── server-update.sh
@@ -283,7 +287,7 @@ Class ────< SessioExamen ──< RegistreConnexio ──< PeticioTdns
 | Canal Redis | Receptor | Events |
 |------------|---------|--------|
 | `examen:sessio:{id}` | Professor | `AlumneConnectat`, `AlumneDesconnectat`, `NouCheckin`, `NovaPeticioExterna`, `MacDesconeguda`, `MissatgeActualitzat`, `SessioTancadaGlobal` |
-| `examen:alumne:{id}` | Alumne | `MissatgeProfessor`, `SessioTancadaGlobal` |
+| `examen:alumne:{id}` | Alumne | `MissatgeProfessor`, `SessioTancadaGlobal`, `RecursosActualitzats` |
 
 ---
 
@@ -314,12 +318,30 @@ Class ────< SessioExamen ──< RegistreConnexio ──< PeticioTdns
 ## Tests
 
 ```bash
-dotnet test AutoCo.Tests/
+dotnet test EntornExamen.Tests/
 ```
 
 ---
 
 ## Changelog
+
+### v3.5.0 (2026-04-29)
+- **Gateway per sessió** — el professor pot especificar una IP de gateway en crear una sessió. L'API desa `GatewayIp` a `SessionsExamen` i `BindService.AplicarCanavisAsync` genera el fitxer `gateway-rules` (format `IP_ALUMNE GATEWAY_IP`). El daemon `watch-net-control.sh` aplica policy routing (`ip rule` + `ip route table 200`) per a cada alumne actiu, permetent rutes personalitzades per sessió/classe.
+- **Fix `SetSessioRecursosAsync`** — corregit error de traducció LINQ a SQL quan s'aplicava `.OrderBy()` sobre un constructor de record DTO dins del join; ara s'usa un tipus anònim intermedi.
+- **Tests `BindServiceTests.cs`** — cobertura completa de CRUD de dominis i generació de fitxers (`blocked-zones.conf`, `blocked-zone.db`, `dns-intercept`, `gateway-rules`).
+- **Tests `SetSessioRecursos`** — nous tests unitaris per a assignació/eliminació de recursos i notificació en temps real als alumnes connectats.
+
+### v3.4.0 (2026-04-29)
+- **Notificació temps real de recursos als alumnes** — quan el professor actualitza els recursos d'una sessió, els alumnes connectats reben l'event `RecursosActualitzats` per Redis i la llista d'icones es refresca al moment sense necessitat de nou check-in.
+- **Visor de logs Docker** (`/admin/logs`) — terminal estil fosc, desplegable de contenidors, selector de línies, auto-refresc cada 10 s. Llegeix via Unix socket `/var/run/docker.sock` i parseja el format multiplexat de Docker (capçalera 8 bytes per frame).
+- **Control de xarxa** (`/admin/control-xarxa`) — bloqueig DNS per domini via BIND9 (zones auto-generades), toggle d'intercepció DNS (iptables DNAT), botó "Generar i aplicar fitxers" que escriu al volum `net-control`.
+- **Script `watch-net-control.sh`** — daemon de host que utilitza `inotifywait` per detectar canvis al volum `net-control` i aplica: zones BIND9 (`rndc reload`), intercepció DNS (`iptables DNAT`) i policy routing per alumne.
+
+### v3.3.0 (2026-04-29)
+- **Còpies de seguretat com a ZIP** — les còpies automàtiques al servidor es generen en format ZIP (JSON + fotos + recursos). El gestor de backup list i restore admet ara tant `.json` com `.zip`.
+- **Recursos inclosos al backup** — els recursos d'examen (icones + URL) s'inclouen en l'export i es restauren a l'import.
+- **Snackbar de confirmació** — la pantalla del professor mostra feedback visual en desar els recursos d'una sessió.
+- **Millores als diàlegs de recursos** — icona + etiqueta als checkboxes tant de creació com d'edició de sessió.
 
 ### v3.0.0 (2026-04-28)
 - **Nou estat `Expulsat`** — l'alumne expulsat pel professor queda en un estat permanent (porpra) que impedeix que el check-in automàtic el torni a connectar. Fins ara, el timer de Portal.razor enviava un nou check-in pocs segons després de l'expulsió i el registre es reactivava a la BD.

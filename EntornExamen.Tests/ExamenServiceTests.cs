@@ -418,4 +418,80 @@ public class ExamenServiceTests
         Assert.True(ok);
         Assert.Equal(0, await db.AlumneMacs.CountAsync());
     }
+
+    // ── Tests de SetSessioRecursos ────────────────────────────────────────────
+
+    [Fact]
+    public async Task SetSessioRecursos_AssignaRecursos_MostrarRecursosActiu()
+    {
+        var (db, profId, classId, _) =
+            SeedBase(nameof(SetSessioRecursos_AssignaRecursos_MostrarRecursosActiu));
+        var svc = CreateSvc(db);
+
+        db.RecursosExamen.AddRange(
+            new RecursExamen { Id = 1, Icona = "link", Etiqueta = "Google", Url = "https://google.com", Ordre = 1 },
+            new RecursExamen { Id = 2, Icona = "book", Etiqueta = "Wiki",   Url = "https://wiki.cat",  Ordre = 2 });
+        await db.SaveChangesAsync();
+
+        var (sessio, _) = await svc.CreateSessioAsync(
+            new CreateSessioRequest(classId, "Prova recursos", null), profId);
+        Assert.NotNull(sessio);
+
+        var ok = await svc.SetSessioRecursosAsync(sessio.Id, [1, 2], profId, false);
+
+        Assert.True(ok);
+        var sessioDb = await db.SessionsExamen.FindAsync(sessio.Id);
+        Assert.True(sessioDb?.MostrarRecursos);
+        Assert.Equal(2, await db.SessioExamenRecursos.CountAsync(sr => sr.SessioId == sessio.Id));
+    }
+
+    [Fact]
+    public async Task SetSessioRecursos_LlistaVuida_DesactivaMostrarRecursos()
+    {
+        var (db, profId, classId, _) =
+            SeedBase(nameof(SetSessioRecursos_LlistaVuida_DesactivaMostrarRecursos));
+        var svc = CreateSvc(db);
+
+        db.RecursosExamen.Add(
+            new RecursExamen { Id = 1, Icona = "link", Etiqueta = "Google", Url = "https://google.com", Ordre = 1 });
+        await db.SaveChangesAsync();
+
+        var (sessio, _) = await svc.CreateSessioAsync(
+            new CreateSessioRequest(classId, "Prova", null), profId);
+        Assert.NotNull(sessio);
+
+        await svc.SetSessioRecursosAsync(sessio.Id, [1], profId, false);
+        var ok = await svc.SetSessioRecursosAsync(sessio.Id, [], profId, false);
+
+        Assert.True(ok);
+        var sessioDb = await db.SessionsExamen.FindAsync(sessio.Id);
+        Assert.False(sessioDb?.MostrarRecursos);
+        Assert.Equal(0, await db.SessioExamenRecursos.CountAsync(sr => sr.SessioId == sessio.Id));
+    }
+
+    [Fact]
+    public async Task SetSessioRecursos_AlumneConnectat_NotificaRecursos()
+    {
+        var (db, profId, classId, studentId) =
+            SeedBase(nameof(SetSessioRecursos_AlumneConnectat_NotificaRecursos));
+        var svc = CreateSvc(db);
+
+        db.RecursosExamen.Add(
+            new RecursExamen { Id = 1, Icona = "link", Etiqueta = "Recursos", Url = "https://escola.cat", Ordre = 1 });
+        await db.SaveChangesAsync();
+
+        var (sessio, _) = await svc.CreateSessioAsync(
+            new CreateSessioRequest(classId, "Prova notif.", null), profId);
+        Assert.NotNull(sessio);
+
+        // Alumne fa check-in → connectat
+        await svc.CheckinAsync(new CheckinRequest("joan.mas@sarria.salesians.cat"), TestIp);
+
+        // Ara actualitzem recursos — no ha de llançar excepció (hub.Redis pot ser null en tests)
+        var ok = await svc.SetSessioRecursosAsync(sessio.Id, [1], profId, false);
+        Assert.True(ok);
+
+        // Els recursos han quedat assignats a la sessió
+        Assert.Equal(1, await db.SessioExamenRecursos.CountAsync(sr => sr.SessioId == sessio.Id));
+    }
 }

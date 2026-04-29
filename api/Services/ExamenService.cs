@@ -78,7 +78,7 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         new(s.Id, s.ClassId, s.Class?.Name ?? "", s.ProfessorId, s.Professor?.NomComplet ?? "",
             s.Titol, s.Descripcio, s.MissatgeActiu,
             s.IniciadaAt, s.TancadaAt, s.Activa, total, connectats, CheckinIntervalSegons,
-            s.MostrarRecursos);
+            s.MostrarRecursos, s.GatewayIp);
 
     // ─── Sessions ─────────────────────────────────────────────────────────────
 
@@ -123,7 +123,8 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             Descripcio      = req.Descripcio?.Trim(),
             IniciadaAt      = DateTime.UtcNow,
             Activa          = true,
-            MostrarRecursos = req.RecursIds?.Count > 0
+            MostrarRecursos = req.RecursIds?.Count > 0,
+            GatewayIp       = string.IsNullOrWhiteSpace(req.GatewayIp) ? null : req.GatewayIp.Trim()
         };
         db.SessionsExamen.Add(sessio);
         await db.SaveChangesAsync();
@@ -1083,12 +1084,14 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         await db.SaveChangesAsync();
 
         // Notifica en temps real a tots els alumnes actius de la sessió
-        var recursosActuals = await db.SessioExamenRecursos
+        var recursosActuals = (await db.SessioExamenRecursos
             .Where(sr => sr.SessioId == sessioId)
             .Join(db.RecursosExamen, sr => sr.RecursId, r => r.Id,
-                (sr, r) => new RecursExamenDto(r.Id, r.Icona, r.Etiqueta, r.Url, r.Ordre))
+                (sr, r) => new { r.Id, r.Icona, r.Etiqueta, r.Url, r.Ordre })
             .OrderBy(r => r.Ordre)
-            .ToListAsync();
+            .ToListAsync())
+            .Select(r => new RecursExamenDto(r.Id, r.Icona, r.Etiqueta, r.Url, r.Ordre))
+            .ToList();
 
         var studentIds = await db.RegistresConnexio
             .Where(r => r.SessioId == sessioId && r.StudentId != null && r.DesconnectatAt == null)

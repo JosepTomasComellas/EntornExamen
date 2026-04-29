@@ -112,9 +112,10 @@ public record SessioExamenDto(
     DateTime IniciadaAt, DateTime? TancadaAt, bool Activa,
     int TotalAlumnes, int AlumnesConnectats,
     int IntervalSegons = 30,
-    bool MostrarRecursos = false);
+    bool MostrarRecursos = false,
+    string? GatewayIp = null);
 
-public record CreateSessioRequest(int ClassId, string? Titol, string? Descripcio, List<int>? RecursIds = null);
+public record CreateSessioRequest(int ClassId, string? Titol, string? Descripcio, List<int>? RecursIds = null, string? GatewayIp = null);
 
 public record SetSessioRecursosRequest(List<int> RecursIds);
 

@@ -12,6 +12,7 @@ public class SessioExamen
     public DateTime? TancadaAt       { get; set; }
     public bool     Activa           { get; set; } = true;
     public bool     MostrarRecursos  { get; set; } = false;
+    public string?  GatewayIp        { get; set; }
 
     public Class     Class     { get; set; } = null!;
     public Professor Professor { get; set; } = null!;
