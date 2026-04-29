@@ -34,7 +34,8 @@ public interface IExamenService
     Task<bool> DeleteMacAsync(int id, bool isAdmin);
 }
 
-public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config) : IExamenService
+public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config,
+    ILogger<ExamenService> logger) : IExamenService
 {
     private static string NormalitzaMac(string mac) =>
         mac.Trim().ToLowerInvariant();
@@ -360,8 +361,9 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             registre.Estat          = EstatConnexio.Connectat;
             mac = registre.MacAddress;
 
-            // Associa MAC a l'alumne si no existia
-            if (!string.IsNullOrEmpty(mac) && !student.Macs.Any(m => m.Mac == mac))
+            // Associa MAC a l'alumne si és una MAC real (no la IP provisional del check-in sense DHCP)
+            if (!string.IsNullOrEmpty(mac) && mac != clientIp && mac.Contains(':') &&
+                !student.Macs.Any(m => m.Mac == mac))
             {
                 db.AlumneMacs.Add(new AlumneMac
                 {
@@ -412,22 +414,49 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         var sessions = await db.SessionsExamen.Where(s => s.Activa).Select(s => s.Id).ToListAsync();
         if (sessions.Count == 0) return;
 
+        // Cerca per MAC real; si no es troba, busca si hi ha un registre on la IP s'usava
+        // com a MAC provisional (creat per check-in sense DHCP previ).
         var registre = await db.RegistresConnexio
             .Include(r => r.Student)
-            .FirstOrDefaultAsync(r => sessions.Contains(r.SessioId) && r.MacAddress == mac);
+            .FirstOrDefaultAsync(r => sessions.Contains(r.SessioId) && r.MacAddress == mac)
+            ?? (!string.IsNullOrEmpty(req.Ip)
+                ? await db.RegistresConnexio
+                    .Include(r => r.Student)
+                    .FirstOrDefaultAsync(r => sessions.Contains(r.SessioId) &&
+                        r.MacAddress == req.Ip && r.IpAssignada == req.Ip)
+                : null);
 
         if (req.Event == "connected")
         {
             if (registre is not null)
             {
                 if (registre.Estat == EstatConnexio.Expulsat) return;
+                registre.MacAddress  = mac;      // corregeix IP provisional → MAC real
                 registre.IpAssignada = req.Ip;
                 registre.Estat       = EstatConnexio.Connectat;
+
+                // Associa la MAC real a l'alumne si és la primera vegada
+                if (registre.StudentId.HasValue)
+                {
+                    var jaExisteix = await db.AlumneMacs
+                        .AnyAsync(m => m.StudentId == registre.StudentId.Value && m.Mac == mac);
+                    if (!jaExisteix)
+                        db.AlumneMacs.Add(new AlumneMac
+                        {
+                            StudentId     = registre.StudentId.Value,
+                            Mac           = mac,
+                            PrimerCopVist = ara
+                        });
+                }
+
                 await db.SaveChangesAsync();
 
                 _ = hub.NotificaAlumneConnectatAsync(registre.SessioId, new ExamenEventAlumne(
                     registre.StudentId, registre.Student?.Nom, registre.Student?.Cognoms,
                     req.Ip, mac, ara));
+
+                logger.LogInformation("DHCP connected: MAC {Mac} → IP {Ip} (alumne: {Nom})",
+                    mac, req.Ip, registre.Student?.Nom ?? "desconegut");
             }
             else
             {
@@ -437,8 +466,8 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 {
                     var nouRegistre = new RegistreConnexio
                     {
-                        SessioId   = sessioActiva.Id,
-                        MacAddress = mac,
+                        SessioId    = sessioActiva.Id,
+                        MacAddress  = mac,
                         IpAssignada = req.Ip,
                         ConnectatAt = ara,
                         Estat       = EstatConnexio.Connectat
@@ -446,6 +475,7 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                     db.RegistresConnexio.Add(nouRegistre);
                     await db.SaveChangesAsync();
 
+                    logger.LogInformation("DHCP connected: MAC desconeguda {Mac} → IP {Ip}", mac, req.Ip);
                     _ = hub.NotificaMacDesconegudaAsync(sessioActiva.Id, new ExamenEventAlumne(
                         null, null, null, req.Ip, mac, ara));
                 }
@@ -454,10 +484,13 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         else if (req.Event == "disconnected" && registre is not null &&
                  registre.Estat != EstatConnexio.Expulsat)
         {
+            registre.MacAddress     = mac;   // corregeix IP provisional si cal
             registre.Estat          = EstatConnexio.Desconnectat;
             registre.DesconnectatAt = ara;
             await db.SaveChangesAsync();
 
+            logger.LogInformation("DHCP disconnected: MAC {Mac} (alumne: {Nom})",
+                mac, registre.Student?.Nom ?? "desconegut");
             _ = hub.NotificaAlumneDesconnectatAsync(registre.SessioId, new ExamenEventAlumne(
                 registre.StudentId, registre.Student?.Nom, registre.Student?.Cognoms,
                 registre.IpAssignada, mac, ara));
