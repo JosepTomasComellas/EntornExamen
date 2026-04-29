@@ -1,4 +1,4 @@
-# EntornExamen · v3.0.0
+# EntornExamen · v3.3.0
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 Branding, colors, logo i xarxa DHCP configurables des del `.env`.
@@ -34,7 +34,8 @@ A partir d'aquí, fa check-in cada 30 s i el professor veu l'estat de tota la cl
 
 ### Professor (`/professor/examen`)
 - Inicia / tanca / reobre sessions d'examen per classe
-- Monitoratge en temps real: estat de cada alumne (connectat / sense check-in / desconnectat)
+- Selecció de recursos (icones + enllaços) que es mostren als alumnes durant la sessió
+- Monitoratge en temps real: estat de cada alumne (connectat / sense check-in / desconnectat / expulsat)
 - Alertes de desconnexió amb so (Web Audio API, sense fitxers externs)
 - Alertes de peticions DNS externes sospitoses
 - Missatges push: apareixen com a diàleg obligatori a la pantalla de l'alumne
@@ -46,12 +47,15 @@ A partir d'aquí, fa check-in cada 30 s i el professor veu l'estat de tota la cl
 - Check-in automàtic cada 30 s
 - Rebuda de missatges del professor (diàleg emergent obligatori)
 - Mostra IP real i ID de sessió a la pantalla de seguiment
+- Accés als recursos habilitats pel professor (icones d'enllaços, visibles per sessió)
 
 ### Admin
 - Gestió de professors, classes i alumnes
 - Importació d'alumnes des d'EPSS (XLS/HTML auto-detectat)
 - Importació de fotos (ZIP amb `{DNI_numèric}.jpg`)
-- Còpies de seguretat JSON (export/import)
+- Gestió de recursos d'examen (icones + enllaços configurables globalment)
+- Còpies de seguretat JSON i ZIP complet (JSON + fotos + recursos) amb export/import
+- Còpies automàtiques al servidor en format ZIP
 - Estadístiques d'accessos de professors
 - Gestió de dispositius registrats (`/admin/examen-macs`)
 
@@ -211,7 +215,7 @@ EntornExamen/
 │   ├── Hubs/
 │   │   └── ExamenHub.cs          # Publicador Redis (temps real)
 │   ├── Services/
-│   │   ├── ExamenService.cs         # Lògica sessions + check-in per IP
+│   │   ├── ExamenService.cs         # Lògica sessions + check-in per IP + recursos per sessió
 │   │   ├── DhcpMonitorService.cs    # Monitor dhcpd.leases (IHostedService)
 │   │   ├── DnsMonitorService.cs     # Monitor dns-queries.log (IHostedService)
 │   │   ├── CheckinTimeoutService.cs # Detecta check-ins aturats → Desconnectat
@@ -219,7 +223,7 @@ EntornExamen/
 │   │   ├── SessioCleanupService.cs  # Neteja sessions tancades fa >30 dies
 │   │   ├── AuthService.cs           # Login professors (JWT)
 │   │   ├── ClassService.cs          # Classes + alumnes
-│   │   ├── BackupService.cs         # Export/import JSON
+│   │   ├── BackupService.cs         # Export/import JSON + ZIP complet (amb fotos i recursos)
 │   │   └── EmailService.cs          # SMTP (professors)
 │   └── Program.cs                   # Endpoints + DI
 ├── web/                             # Blazor Server + MudBlazor
