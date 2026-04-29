@@ -264,6 +264,20 @@ public class ApiClient
         catch { return (null, "Error desconegut."); }
     }
 
+    // ── Recursos examen (admin) ───────────────────────────────────────────────
+
+    public Task<List<RecursExamenDto>?> GetRecursosExamenAsync() =>
+        GetAsync<List<RecursExamenDto>>("/api/admin/recursos");
+
+    public Task<RecursExamenDto?> CreateRecursExamenAsync(CreateRecursRequest req) =>
+        PostAsync<RecursExamenDto>("/api/admin/recursos", req);
+
+    public Task<RecursExamenDto?> UpdateRecursExamenAsync(int id, UpdateRecursRequest req) =>
+        PutAsync<RecursExamenDto>($"/api/admin/recursos/{id}", req);
+
+    public Task<bool> DeleteRecursExamenAsync(int id) =>
+        DeleteAsync($"/api/admin/recursos/{id}");
+
     // ── Diagnòstic (admin) ────────────────────────────────────────────────────
 
     public Task<DiagnosticDto?> GetDiagnosticAsync() =>

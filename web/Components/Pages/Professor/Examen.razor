@@ -649,6 +649,9 @@
             <MudTextField @bind-Value="_novaDescripcio"
                           Label="@Loc["Examen_Instructions"]"
                           Variant="Variant.Outlined" Lines="3" />
+            <MudSwitch T="bool" @bind-Value="_novaMostrarRecursos"
+                       Color="Color.Primary" Label="Mostrar recursos (icones i enllaços)"
+                       LabelPosition="LabelPosition.End" />
         </MudStack>
         @if (_errorNovaSessio is not null)
         {
@@ -717,8 +720,9 @@
     private bool    _mostrarDialegNovaSessio;
     private bool    _mostrarDialegMissatge;
     private int     _novaClasseId;
-    private string  _novaTitol     = "";
-    private string  _novaDescripcio = "";
+    private string  _novaTitol          = "";
+    private string  _novaDescripcio     = "";
+    private bool    _novaMostrarRecursos = false;
     private string? _errorNovaSessio;
     private string  _textMissatge  = "";
 
@@ -932,13 +936,13 @@
         }
         _carregant = true;
         var (sessio, error) = await Api.CreateExamenSessioAsync(
-            new CreateSessioRequest(_novaClasseId, _novaTitol, _novaDescripcio));
+            new CreateSessioRequest(_novaClasseId, _novaTitol, _novaDescripcio, _novaMostrarRecursos));
         _carregant = false;
 
         if (error is not null) { _errorNovaSessio = error; return; }
 
         _mostrarDialegNovaSessio = false;
-        _novaTitol = ""; _novaDescripcio = ""; _novaClasseId = 0;
+        _novaTitol = ""; _novaDescripcio = ""; _novaClasseId = 0; _novaMostrarRecursos = false;
         _sessions = await Api.GetExamenSessionsAsync() ?? [];
         if (sessio is not null)
             await SeleccionarSessio(sessio.Id);

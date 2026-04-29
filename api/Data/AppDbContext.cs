@@ -13,6 +13,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<SessioExamen>      SessionsExamen    => Set<SessioExamen>();
     public DbSet<RegistreConnexio>  RegistresConnexio => Set<RegistreConnexio>();
     public DbSet<PeticioTdns>       PeticiosDns       => Set<PeticioTdns>();
+    public DbSet<RecursExamen>      RecursosExamen    => Set<RecursExamen>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -96,6 +97,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
              .OnDelete(DeleteBehavior.Cascade);
             e.Property(p => p.Domini).HasMaxLength(253);
             e.HasIndex(p => new { p.RegistreId, p.Timestamp });
+        });
+
+        b.Entity<RecursExamen>(e => {
+            e.Property(r => r.Icona).HasMaxLength(100);
+            e.Property(r => r.Etiqueta).HasMaxLength(200);
+            e.Property(r => r.Url).HasMaxLength(2048);
+            e.HasIndex(r => r.Ordre);
         });
     }
 }

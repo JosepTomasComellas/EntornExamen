@@ -218,6 +218,25 @@ using (var scope = app.Services.CreateScope())
             CREATE INDEX [IX_PeticiosDns_RegistreId_Timestamp]
                 ON [PeticiosDns] ([RegistreId], [Timestamp]);
         END
+
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'RecursosExamen')
+        BEGIN
+            CREATE TABLE [RecursosExamen] (
+                [Id]       INT            NOT NULL IDENTITY(1,1),
+                [Icona]    NVARCHAR(100)  NOT NULL DEFAULT '',
+                [Etiqueta] NVARCHAR(200)  NOT NULL DEFAULT '',
+                [Url]      NVARCHAR(2048) NOT NULL DEFAULT '',
+                [Ordre]    INT            NOT NULL DEFAULT 0,
+                CONSTRAINT [PK_RecursosExamen] PRIMARY KEY ([Id])
+            );
+            CREATE INDEX [IX_RecursosExamen_Ordre] ON [RecursosExamen] ([Ordre]);
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                       WHERE TABLE_NAME = 'SessionsExamen' AND COLUMN_NAME = 'MostrarRecursos')
+        BEGIN
+            ALTER TABLE [SessionsExamen] ADD [MostrarRecursos] BIT NOT NULL DEFAULT 0;
+        END
         """);
 
     // SQL Server Express activa AUTO_CLOSE per defecte: desactivar-lo evita
@@ -934,6 +953,66 @@ app.MapPost("/api/examen/importar-fotos", async (HttpRequest httpReq,
     return error is not null
         ? Results.BadRequest(new { error })
         : Results.Ok(result);
+}).RequireAuthorization();
+
+// ════════════════════════════════════════════════════════════════════════════
+// RECURSOS EXAMEN (icones/enllaços globals — admin only per a escriptura)
+// ════════════════════════════════════════════════════════════════════════════
+
+app.MapGet("/api/admin/recursos", async (AppDbContext db, ClaimsPrincipal user) =>
+{
+    if (!IsProfessor(user)) return Results.Forbid();
+    var list = await db.RecursosExamen
+        .OrderBy(r => r.Ordre).ThenBy(r => r.Id)
+        .Select(r => new RecursExamenDto(r.Id, r.Icona, r.Etiqueta, r.Url, r.Ordre))
+        .ToListAsync();
+    return Results.Ok(list);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/recursos", async (CreateRecursRequest req, AppDbContext db,
+    ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    if (string.IsNullOrWhiteSpace(req.Etiqueta) || string.IsNullOrWhiteSpace(req.Url))
+        return Results.BadRequest(new { error = "Etiqueta i URL són obligatòries." });
+
+    var recurs = new EntornExamen.Api.Data.Models.RecursExamen
+    {
+        Icona    = req.Icona.Trim(),
+        Etiqueta = req.Etiqueta.Trim(),
+        Url      = req.Url.Trim(),
+        Ordre    = req.Ordre
+    };
+    db.RecursosExamen.Add(recurs);
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/admin/recursos/{recurs.Id}",
+        new RecursExamenDto(recurs.Id, recurs.Icona, recurs.Etiqueta, recurs.Url, recurs.Ordre));
+}).RequireAuthorization();
+
+app.MapPut("/api/admin/recursos/{id:int}", async (int id, UpdateRecursRequest req,
+    AppDbContext db, ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    var recurs = await db.RecursosExamen.FindAsync(id);
+    if (recurs is null) return Results.NotFound();
+
+    recurs.Icona    = req.Icona.Trim();
+    recurs.Etiqueta = req.Etiqueta.Trim();
+    recurs.Url      = req.Url.Trim();
+    recurs.Ordre    = req.Ordre;
+    await db.SaveChangesAsync();
+    return Results.Ok(new RecursExamenDto(recurs.Id, recurs.Icona, recurs.Etiqueta, recurs.Url, recurs.Ordre));
+}).RequireAuthorization();
+
+app.MapDelete("/api/admin/recursos/{id:int}", async (int id, AppDbContext db,
+    ClaimsPrincipal user) =>
+{
+    if (!IsAdmin(user)) return Results.Forbid();
+    var recurs = await db.RecursosExamen.FindAsync(id);
+    if (recurs is null) return Results.NotFound();
+    db.RecursosExamen.Remove(recurs);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
 }).RequireAuthorization();
 
 app.Run();

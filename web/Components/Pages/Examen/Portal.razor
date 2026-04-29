@@ -133,6 +133,28 @@
                         Color="Color.Success" Rounded="true" Size="Size.Small"
                         Class="mb-3" />
 
+                    @if (_checkinResp.Sessio.MostrarRecursos && _checkinResp.Sessio.Recursos?.Count > 0)
+                    {
+                        <MudDivider Class="mb-3" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2 d-block"
+                                 Style="text-transform:uppercase;letter-spacing:.05em;font-weight:600">
+                            Recursos
+                        </MudText>
+                        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2" Class="mb-3">
+                            @foreach (var recurs in _checkinResp.Sessio.Recursos.OrderBy(r => r.Ordre))
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                           StartIcon="@($"@Icons.Material.Filled.{recurs.Icona}")"
+                                           Size="Size.Small"
+                                           Href="@recurs.Url" Target="_blank"
+                                           Rel="noopener noreferrer">
+                                    @recurs.Etiqueta
+                                </MudButton>
+                            }
+                        </MudStack>
+                        <MudDivider Class="mb-3" />
+                    }
+
                     <MudStack Row="true" Spacing="4" Class="mb-4" Style="opacity:.6">
                         <MudText Typo="Typo.caption" Color="Color.Secondary">
                             IP: @(string.IsNullOrWhiteSpace(CircuitState.ClientIp) ? "—" : CircuitState.ClientIp)

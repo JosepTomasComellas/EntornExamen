@@ -94,15 +94,23 @@ public enum EstatConnexioDto
     Connectat, SenseCheckin, Desconnectat, NoConnectat, Expulsat
 }
 
+// ─── Recursos examen (icones/enllaços globals) ────────────────────────────────
+public record RecursExamenDto(int Id, string Icona, string Etiqueta, string Url, int Ordre);
+
+public record CreateRecursRequest(string Icona, string Etiqueta, string Url, int Ordre);
+
+public record UpdateRecursRequest(string Icona, string Etiqueta, string Url, int Ordre);
+
 // ─── Sessions d'examen ───────────────────────────────────────────────────────
 public record SessioExamenDto(
     int Id, int ClassId, string ClassName, int ProfessorId, string ProfessorNom,
     string? Titol, string? Descripcio, string? MissatgeActiu,
     DateTime IniciadaAt, DateTime? TancadaAt, bool Activa,
     int TotalAlumnes, int AlumnesConnectats,
-    int IntervalSegons = 30);
+    int IntervalSegons = 30,
+    bool MostrarRecursos = false);
 
-public record CreateSessioRequest(int ClassId, string? Titol, string? Descripcio);
+public record CreateSessioRequest(int ClassId, string? Titol, string? Descripcio, bool MostrarRecursos = false);
 
 public record MissatgeRequest(string Text);
 
@@ -131,7 +139,9 @@ public record CheckinAlumneInfo(
 
 public record CheckinSessioInfo(
     int SessioId, string? Titol, string? Descripcio, string? MissatgeActiu,
-    int IntervalSegons = 30);
+    int IntervalSegons = 30,
+    bool MostrarRecursos = false,
+    List<RecursExamenDto>? Recursos = null);
 
 // ─── Esdeveniments DHCP / DNS ────────────────────────────────────────────────
 public record DhcpEventRequest(string Mac, string? Ip, string Event);  // "connected" | "disconnected"

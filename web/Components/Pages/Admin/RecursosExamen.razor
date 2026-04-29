@@ -1,0 +1,280 @@
+@page "/admin/recursos"
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject UserStateService UserState
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<SharedResources> Loc
+
+<PageTitle>Recursos d'Examen – Entorn d'Examens</PageTitle>
+@if (!UserState.IsAdmin) { Nav.NavigateTo("/"); return; }
+
+<!-- Capçalera -->
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
+    <MudButton StartIcon="@Icons.Material.Filled.ArrowBack"
+               Href="/professor/dashboard"
+               Variant="Variant.Text" Color="Color.Default">
+        @Loc["Nav_Dashboard"]
+    </MudButton>
+    <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+    <MudIcon Icon="@Icons.Material.Filled.Apps" Color="Color.Primary" Class="mr-1" />
+    <MudText Typo="Typo.h5" Style="font-weight:700">Recursos d'Examen</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="ObrirCrear">
+        Nou recurs
+    </MudButton>
+</MudStack>
+
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    Icones i enllaços que es mostren als alumnes durant l'examen quan el professor activa
+    l'opció <strong>Mostrar recursos</strong> en crear la sessió.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+else if (_recursos.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">
+        Encara no hi ha recursos configurats. Afegeix el primer recurs amb el botó <strong>Nou recurs</strong>.
+    </MudAlert>
+}
+else
+{
+    <MudPaper Elevation="1" Class="pa-0">
+        <MudTable Items="_recursos" Dense="true" Hover="true" Elevation="0">
+            <HeaderContent>
+                <MudTh Style="width:60px">Ordre</MudTh>
+                <MudTh Style="width:80px">Icona</MudTh>
+                <MudTh>Etiqueta</MudTh>
+                <MudTh>URL</MudTh>
+                <MudTh Style="width:120px"></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Ordre</MudTd>
+                <MudTd>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@($"@Icons.Material.Filled.{context.Icona}")"
+                                 Size="Size.Small" Color="Color.Primary" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Icona</MudText>
+                    </MudStack>
+                </MudTd>
+                <MudTd>@context.Etiqueta</MudTd>
+                <MudTd>
+                    <MudText Typo="Typo.caption" Style="word-break:break-all">@context.Url</MudText>
+                </MudTd>
+                <MudTd>
+                    <MudStack Row="true" Spacing="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Size="Size.Small" Color="Color.Primary"
+                                       OnClick="() => ObrirEditar(context)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small" Color="Color.Error"
+                                       OnClick="() => Eliminar(context)" />
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+}
+
+<!-- Diàleg crear / editar -->
+<MudDialog @bind-Visible="_mostrarDialog">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@(_editant is null ? Icons.Material.Filled.Add : Icons.Material.Filled.Edit)"
+                     Color="Color.Primary" />
+            <MudText Typo="Typo.h6">
+                @(_editant is null ? "Nou recurs" : "Editar recurs")
+            </MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudSelect T="string" @bind-Value="_formIcona" Label="Icona"
+                       Variant="Variant.Outlined" Dense="true">
+                @foreach (var icona in _iconesDisponibles)
+                {
+                    <MudSelectItem T="string" Value="@icona.Nom">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIcon Icon="@($"@Icons.Material.Filled.{icona.Nom}")"
+                                     Size="Size.Small" />
+                            <span>@icona.Etiqueta</span>
+                        </MudStack>
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField @bind-Value="_formEtiqueta" Label="Etiqueta (text visible)"
+                          Variant="Variant.Outlined" Dense="true" Immediate="true"
+                          MaxLength="200" />
+
+            <MudTextField @bind-Value="_formUrl" Label="URL"
+                          Variant="Variant.Outlined" Dense="true" Immediate="true"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Link"
+                          MaxLength="2048" />
+
+            <MudNumericField T="int" @bind-Value="_formOrdre" Label="Ordre (menor = primer)"
+                             Variant="Variant.Outlined" Dense="true" Min="0" Max="999" />
+
+            <!-- Previsualització -->
+            @if (!string.IsNullOrWhiteSpace(_formIcona) && !string.IsNullOrWhiteSpace(_formEtiqueta))
+            {
+                <MudPaper Elevation="0" Class="pa-3" Style="background:var(--mud-palette-background-grey)">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">Previsualització:</MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                               StartIcon="@($"@Icons.Material.Filled.{_formIcona}")"
+                               Size="Size.Medium" Disabled="true">
+                        @_formEtiqueta
+                    </MudButton>
+                </MudPaper>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="TancarDialog">@Loc["Action_Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="Desar" Disabled="_desant">
+            @if (_desant)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            @Loc["Action_Save"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private record IconaItem(string Nom, string Etiqueta);
+
+    private static readonly List<IconaItem> _iconesDisponibles =
+    [
+        new("MenuBook",     "Apunts / Llibre"),
+        new("Assignment",   "Assignació / Tasca"),
+        new("Language",     "Web / Internet"),
+        new("Laptop",       "Ordinador / Portàtil"),
+        new("Calculate",    "Calculadora"),
+        new("Code",         "Codi / IDE"),
+        new("Storage",      "Servidor / Disc"),
+        new("Terminal",     "Terminal"),
+        new("Search",       "Cerca / Documentació"),
+        new("Description",  "Document / Fitxer"),
+        new("School",       "Escola / Classe"),
+        new("Link",         "Enllaç"),
+        new("OpenInNew",    "Obre en nova finestra"),
+        new("Cloud",        "Núvol / Cloud"),
+        new("Science",      "Ciència / Lab"),
+        new("Build",        "Eines"),
+        new("Extension",    "Extensió / Plugin"),
+        new("DataObject",   "Dades / JSON"),
+        new("TableChart",   "Taula / Full de càlcul"),
+        new("Hub",          "Hub / Xarxa"),
+    ];
+
+    private List<RecursExamenDto> _recursos = [];
+    private bool _loading  = true;
+    private bool _desant   = false;
+
+    private bool              _mostrarDialog;
+    private RecursExamenDto?  _editant;
+
+    private string _formIcona    = "Language";
+    private string _formEtiqueta = "";
+    private string _formUrl      = "";
+    private int    _formOrdre    = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserState.IsAdmin) return;
+        Api.SetToken(UserState.Token!);
+        await Carregar();
+    }
+
+    private async Task Carregar()
+    {
+        _loading  = true;
+        _recursos = await Api.GetRecursosExamenAsync() ?? [];
+        _loading  = false;
+    }
+
+    private void ObrirCrear()
+    {
+        _editant      = null;
+        _formIcona    = "Language";
+        _formEtiqueta = "";
+        _formUrl      = "";
+        _formOrdre    = _recursos.Count > 0 ? (_recursos.Max(r => r.Ordre) + 10) : 10;
+        _mostrarDialog = true;
+    }
+
+    private void ObrirEditar(RecursExamenDto recurs)
+    {
+        _editant       = recurs;
+        _formIcona     = recurs.Icona;
+        _formEtiqueta  = recurs.Etiqueta;
+        _formUrl       = recurs.Url;
+        _formOrdre     = recurs.Ordre;
+        _mostrarDialog = true;
+    }
+
+    private void TancarDialog()
+    {
+        _mostrarDialog = false;
+        _editant       = null;
+    }
+
+    private async Task Desar()
+    {
+        if (string.IsNullOrWhiteSpace(_formEtiqueta) || string.IsNullOrWhiteSpace(_formUrl))
+        {
+            Snackbar.Add("Cal indicar l'etiqueta i la URL.", Severity.Warning);
+            return;
+        }
+
+        _desant = true;
+        bool ok;
+
+        if (_editant is null)
+        {
+            var creat = await Api.CreateRecursExamenAsync(
+                new CreateRecursRequest(_formIcona, _formEtiqueta.Trim(), _formUrl.Trim(), _formOrdre));
+            ok = creat is not null;
+        }
+        else
+        {
+            var actualitzat = await Api.UpdateRecursExamenAsync(_editant.Id,
+                new UpdateRecursRequest(_formIcona, _formEtiqueta.Trim(), _formUrl.Trim(), _formOrdre));
+            ok = actualitzat is not null;
+        }
+
+        _desant = false;
+
+        if (ok)
+        {
+            Snackbar.Add("Recurs desat correctament.", Severity.Success);
+            TancarDialog();
+            await Carregar();
+        }
+        else
+        {
+            Snackbar.Add("Error en desar el recurs.", Severity.Error);
+        }
+    }
+
+    private async Task Eliminar(RecursExamenDto recurs)
+    {
+        var ok = await Api.DeleteRecursExamenAsync(recurs.Id);
+        if (ok)
+        {
+            Snackbar.Add("Recurs eliminat.", Severity.Success);
+            await Carregar();
+        }
+        else
+        {
+            Snackbar.Add("Error en eliminar el recurs.", Severity.Error);
+        }
+    }
+}

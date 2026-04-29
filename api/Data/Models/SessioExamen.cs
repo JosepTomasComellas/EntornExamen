@@ -11,6 +11,7 @@ public class SessioExamen
     public DateTime IniciadaAt       { get; set; } = DateTime.UtcNow;
     public DateTime? TancadaAt       { get; set; }
     public bool     Activa           { get; set; } = true;
+    public bool     MostrarRecursos  { get; set; } = false;
 
     public Class     Class     { get; set; } = null!;
     public Professor Professor { get; set; } = null!;

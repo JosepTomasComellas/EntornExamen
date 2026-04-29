@@ -75,7 +75,8 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
     private SessioExamenDto ToSessioDto(SessioExamen s, int total = 0, int connectats = 0) =>
         new(s.Id, s.ClassId, s.Class?.Name ?? "", s.ProfessorId, s.Professor?.NomComplet ?? "",
             s.Titol, s.Descripcio, s.MissatgeActiu,
-            s.IniciadaAt, s.TancadaAt, s.Activa, total, connectats, CheckinIntervalSegons);
+            s.IniciadaAt, s.TancadaAt, s.Activa, total, connectats, CheckinIntervalSegons,
+            s.MostrarRecursos);
 
     // ─── Sessions ─────────────────────────────────────────────────────────────
 
@@ -114,12 +115,13 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
 
         var sessio = new SessioExamen
         {
-            ClassId     = req.ClassId,
-            ProfessorId = professorId,
-            Titol       = req.Titol?.Trim(),
-            Descripcio  = req.Descripcio?.Trim(),
-            IniciadaAt  = DateTime.UtcNow,
-            Activa      = true
+            ClassId         = req.ClassId,
+            ProfessorId     = professorId,
+            Titol           = req.Titol?.Trim(),
+            Descripcio      = req.Descripcio?.Trim(),
+            IniciadaAt      = DateTime.UtcNow,
+            Activa          = true,
+            MostrarRecursos = req.MostrarRecursos
         };
         db.SessionsExamen.Add(sessio);
         await db.SaveChangesAsync();
@@ -395,11 +397,20 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         _ = hub.NotificaNouCheckinAsync(sessio.Id, new ExamenEventAlumne(
             student.Id, student.Nom, student.Cognoms, clientIp, registre.MacAddress, ara));
 
+        List<RecursExamenDto>? recursos = null;
+        if (sessio.MostrarRecursos)
+        {
+            recursos = await db.RecursosExamen
+                .OrderBy(r => r.Ordre).ThenBy(r => r.Id)
+                .Select(r => new RecursExamenDto(r.Id, r.Icona, r.Etiqueta, r.Url, r.Ordre))
+                .ToListAsync();
+        }
+
         return (new CheckinResponse(
             new CheckinAlumneInfo(student.Id, student.Nom, student.Cognoms,
                 student.Class.Name, TryFotoUrl(student.Id)),
             new CheckinSessioInfo(sessio.Id, sessio.Titol, sessio.Descripcio,
-                sessio.MissatgeActiu, CheckinIntervalSegons)),
+                sessio.MissatgeActiu, CheckinIntervalSegons, sessio.MostrarRecursos, recursos)),
             null);
     }
 
