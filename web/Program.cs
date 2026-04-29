@@ -22,13 +22,15 @@ var redisConn = builder.Configuration["Redis:ConnectionString"] ?? "localhost:63
 var redis = await ConnectionMultiplexer.ConnectAsync(redisConn);
 builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
 
+var circuitGrace = int.TryParse(builder.Configuration["Examen:CircuitGracePeriodSeconds"], out var cg) && cg > 0
+    ? cg : 90;
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options =>
     {
-        // Ha de ser > GracePeriodSeconds (90 s) del CircuitHandler perquè el circuit
-        // no es destrueixi abans que el handler pugui cridar SortirCircuitAsync.
         options.DisconnectedCircuitMaxRetained = 100;
-        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromSeconds(120);
+        // Retenció = grace + 30 s de marge per garantir que el handler pugui actuar
+        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromSeconds(circuitGrace + 30);
     });
 
 builder.Services.AddSignalR()

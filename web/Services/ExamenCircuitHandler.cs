@@ -10,11 +10,13 @@ namespace EntornExamen.Web.Services;
 public class ExamenCircuitHandler(
     ExamenCircuitState state,
     ApiClient api,
+    IConfiguration config,
     ILogger<ExamenCircuitHandler> logger) : CircuitHandler
 {
     private CancellationTokenSource? _cts;
 
-    private const int GracePeriodSeconds = 90;
+    private int GracePeriodSeconds =>
+        int.TryParse(config["Examen:CircuitGracePeriodSeconds"], out var v) && v > 0 ? v : 90;
 
     public override Task OnConnectionDownAsync(Circuit circuit, CancellationToken cancellationToken)
     {
