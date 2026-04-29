@@ -59,7 +59,7 @@ else
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                         <MudIcon Icon="@IconaMatIcon(context.Icona)"
                                  Size="Size.Small" Color="Color.Primary" />
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Icona</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@EtiquetaIcona(context.Icona)</MudText>
                     </MudStack>
                 </MudTd>
                 <MudTd>@context.Etiqueta</MudTd>
@@ -157,28 +157,63 @@ else
 
     private record IconaItem(string Nom, string Etiqueta);
 
+    private string EtiquetaIcona(string nom) =>
+        _iconesDisponibles.FirstOrDefault(i => i.Nom == nom)?.Etiqueta ?? nom;
+
     private static readonly List<IconaItem> _iconesDisponibles =
     [
-        new("MenuBook",     "Apunts / Llibre"),
-        new("Assignment",   "Assignació / Tasca"),
-        new("Language",     "Web / Internet"),
-        new("Laptop",       "Ordinador / Portàtil"),
-        new("Calculate",    "Calculadora"),
-        new("Code",         "Codi / IDE"),
-        new("Storage",      "Servidor / Disc"),
-        new("Terminal",     "Terminal"),
-        new("Search",       "Cerca / Documentació"),
-        new("Description",  "Document / Fitxer"),
-        new("School",       "Escola / Classe"),
-        new("Link",         "Enllaç"),
-        new("OpenInNew",    "Obre en nova finestra"),
-        new("Cloud",        "Núvol / Cloud"),
-        new("Science",      "Ciència / Lab"),
-        new("Build",        "Eines"),
-        new("Extension",    "Extensió / Plugin"),
-        new("DataObject",   "Dades / JSON"),
-        new("TableChart",   "Taula / Full de càlcul"),
-        new("Hub",          "Hub / Xarxa"),
+        // ── Documents i contingut ───────────────────────────────────────────
+        new("MenuBook",          "Apunts / Llibre"),
+        new("Description",       "Document / Fitxer"),
+        new("Assignment",        "Enunciat / Tasca"),
+        new("PictureAsPdf",      "PDF"),
+        new("Folder",            "Carpeta"),
+        new("Archive",           "Arxiu comprimit"),
+        new("TableChart",        "Full de càlcul"),
+        new("Image",             "Imatge"),
+        new("VideoLibrary",      "Vídeo"),
+
+        // ── Web i eines en línia ────────────────────────────────────────────
+        new("Language",          "Web / Internet"),
+        new("Link",              "Enllaç"),
+        new("OpenInNew",         "Obre en nova finestra"),
+        new("Cloud",             "Núvol / Cloud"),
+        new("Search",            "Cerca / Documentació"),
+
+        // ── Programació i sistemes ──────────────────────────────────────────
+        new("Code",              "Codi / IDE"),
+        new("Terminal",          "Terminal / Consola"),
+        new("DeveloperMode",     "Mode desenvolupador"),
+        new("BugReport",         "Depurador / Bug"),
+        new("Api",               "API"),
+        new("DataObject",        "Dades / JSON"),
+        new("Schema",            "Esquema / Diagrama"),
+        new("AccountTree",       "Arbre / Jerarquia"),
+        new("Storage",           "Servidor / Base de dades"),
+        new("Dns",               "DNS / Xarxa"),
+        new("Router",            "Router / Switch"),
+        new("Hub",               "Hub / Xarxa"),
+        new("NetworkWifi",       "WiFi / Connexió"),
+
+        // ── Eines i utilitats ───────────────────────────────────────────────
+        new("Calculate",         "Calculadora"),
+        new("Functions",         "Fórmula / Funció"),
+        new("Science",           "Ciència / Lab"),
+        new("Build",             "Eines"),
+        new("Tune",              "Configuració / Ajustos"),
+        new("Extension",         "Extensió / Plugin"),
+        new("Laptop",            "Portàtil"),
+        new("Computer",          "Ordinador de sobretaula"),
+        new("Monitor",           "Monitor"),
+        new("Keyboard",          "Teclat"),
+
+        // ── Informació i ajuda ──────────────────────────────────────────────
+        new("School",            "Escola / Classe"),
+        new("Info",              "Informació"),
+        new("Help",              "Ajuda"),
+        new("CheckCircle",       "Verificació / Fet"),
+        new("Rule",              "Normes / Regles"),
+        new("VpnKey",            "Contrasenya / Clau"),
     ];
 
     private List<RecursExamenDto> _recursos = [];
