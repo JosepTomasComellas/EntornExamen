@@ -150,9 +150,9 @@ else
 @code {
     private static string IconaMatIcon(string nom)
     {
-        var prop = typeof(Icons.Material.Filled).GetProperty(nom,
+        var field = typeof(Icons.Material.Filled).GetField(nom,
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-        return prop?.GetValue(null) as string ?? Icons.Material.Filled.Link;
+        return field?.GetValue(null) as string ?? Icons.Material.Filled.Link;
     }
 
     private record IconaItem(string Nom, string Etiqueta);
