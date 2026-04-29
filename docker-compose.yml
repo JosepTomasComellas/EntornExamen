@@ -64,6 +64,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT:          Production
       ASPNETCORE_URLS:                 "http://0.0.0.0:8080"
+      ASPNETCORE_HTTP_PORTS:           ""
       ConnectionStrings__DefaultConnection: >
         Server=db;Database=EntornExamen;
         User Id=sa;Password=${MSSQL_SA_PASSWORD};
@@ -119,6 +120,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT:  Production
       ASPNETCORE_URLS:         "http://0.0.0.0:8080"
+      ASPNETCORE_HTTP_PORTS:   ""
       TZ:                      "${TZ:-Europe/Madrid}"
       Logging__LogLevel__Default:     "${LOG_LEVEL:-Warning}"
       Logging__LogLevel__EntornExamen: "Information"

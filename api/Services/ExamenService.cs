@@ -327,6 +327,9 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             clientIp = ipAddr.MapToIPv4().ToString();
 
         var emailNorm = req.Email.Trim().ToLower();
+        var domini = config["Examen:DominiEmail"] ?? "";
+        if (!string.IsNullOrEmpty(domini) && !emailNorm.EndsWith($"@{domini}"))
+            return (null, $"L'email ha de ser del domini @{domini}.");
 
         var student = await db.Students
             .Include(s => s.Class)

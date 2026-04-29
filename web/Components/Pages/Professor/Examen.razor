@@ -152,13 +152,13 @@
                     @if (!seleccionada)
                     {
                         <MudIconButton Icon="@Icons.Material.Filled.Visibility"
-                                       Title="Seleccionar sessió" Size="Size.Small"
+                                       title="Seleccionar sessió" Size="Size.Small"
                                        OnClick="@(() => SeleccionarSessio(s.Id))" />
                     }
                     @if (!s.Activa)
                     {
                         <MudIconButton Icon="@Icons.Material.Filled.DeleteForever"
-                                       Color="Color.Error" Title="Eliminar sessió"
+                                       Color="Color.Error" title="Eliminar sessió"
                                        Size="Size.Small"
                                        OnClick="@(() => { _sessioAEliminar = s; _confirmarEliminarSessio = true; })" />
                     }
@@ -902,7 +902,7 @@
             {
                 var nomAlerta = $"{evt.Nom} {evt.Cognoms}".Trim();
                 if (string.IsNullOrEmpty(nomAlerta)) nomAlerta = evt.Mac ?? evt.Ip ?? "?";
-                if (!ActualitzarAlumne(evt.Mac, a => a with
+                if (!ActualitzarAlumne(evt.Mac ?? "", a => a with
                     { Estat = EstatConnexioDto.Connectat, IpAssignada = evt.Ip }))
                     await CarregarDashboard();
                 AfegirAlerta($"Connectat: {nomAlerta} ({evt.Ip})",

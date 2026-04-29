@@ -109,16 +109,16 @@ else
             </MudSelect>
 
             <MudTextField @bind-Value="_formEtiqueta" Label="Etiqueta (text visible)"
-                          Variant="Variant.Outlined" Dense="true" Immediate="true"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
                           MaxLength="200" />
 
             <MudTextField @bind-Value="_formUrl" Label="URL"
-                          Variant="Variant.Outlined" Dense="true" Immediate="true"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Link"
                           MaxLength="2048" />
 
             <MudNumericField T="int" @bind-Value="_formOrdre" Label="Ordre (menor = primer)"
-                             Variant="Variant.Outlined" Dense="true" Min="0" Max="999" />
+                             Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Max="999" />
 
             <!-- Previsualització -->
             @if (!string.IsNullOrWhiteSpace(_formIcona) && !string.IsNullOrWhiteSpace(_formEtiqueta))
