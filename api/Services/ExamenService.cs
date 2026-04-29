@@ -537,8 +537,9 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 r.Estat != EstatConnexio.Expulsat);
         if (registre is null) return;
 
-        var esExterna = !req.Domini.EndsWith(".examen.local",
-            StringComparison.OrdinalIgnoreCase) && req.Domini != "examen.local";
+        var dnsLocalDomain = config["Examen:DnsLocalDomain"] ?? "examen.local";
+        var esExterna = !req.Domini.EndsWith($".{dnsLocalDomain}",
+            StringComparison.OrdinalIgnoreCase) && req.Domini != dnsLocalDomain;
 
         db.PeticiosDns.Add(new PeticioTdns
         {
@@ -811,11 +812,12 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
     private static string StripHtml(string html) =>
         Regex.Replace(html, "<[^>]+>", "").Trim();
 
-    private static string GeneraEmail(string nom, string cognoms)
+    private string GeneraEmail(string nom, string cognoms)
     {
+        var domini = config["Examen:DominiEmail"] ?? "sarria.salesians.cat";
         var n = Normalitza(nom.Split(' ')[0]);
         var c = Normalitza(cognoms.Split(' ')[0]);
-        return $"{n}.{c}@sarria.salesians.cat";
+        return $"{n}.{c}@{domini}";
     }
 
     private static readonly char[] _accentFrom = "àáâãäåèéêëìíîïòóôõöùúûüçñÀÁÂÃÄÅÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜÇÑ".ToCharArray();

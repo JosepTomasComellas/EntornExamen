@@ -88,6 +88,7 @@ services:
       Logging__LogLevel__Default:     "${LOG_LEVEL:-Warning}"
       Logging__LogLevel__EntornExamen: "Information"
       Examen__DominiEmail:            "${EXAMEN_DOMINI_EMAIL:-sarria.salesians.cat}"
+      Examen__DnsLocalDomain:         "${EXAMEN_DNS_LOCAL_DOMAIN:-examen.local}"
       Examen__CheckinIntervalSeconds: "${EXAMEN_CHECKIN_INTERVAL_SECONDS:-30}"
       Examen__SenseCheckinFactor:     "${EXAMEN_SENSE_CHECKIN_FACTOR:-2}"
       Examen__DesconnectatFactor:     "${EXAMEN_DESCONNECTAT_FACTOR:-4}"
@@ -98,6 +99,7 @@ services:
       Examen__WebWwwrootPath:         "/app/wwwroot"
       NetControl__Path:               "/data/net-control"
       NetControl__RedirectIp:         "${EXAMEN_SERVER_IP:-192.168.100.1}"
+      Docker__AllowedContainers:      "${DOCKER_ALLOWED_CONTAINERS:-entornexamen-api,entornexamen-web,entornexamen-nginx,entornexamen-db,entornexamen-redis}"
     expose:
       - "8080"
     volumes:

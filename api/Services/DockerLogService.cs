@@ -11,15 +11,13 @@ public interface IDockerLogService
     bool IsAvailable();
 }
 
-public class DockerLogService(ILogger<DockerLogService> logger) : IDockerLogService
+public class DockerLogService(IConfiguration config, ILogger<DockerLogService> logger) : IDockerLogService
 {
     private const string SocketPath = "/var/run/docker.sock";
 
-    private static readonly string[] AllowedContainers =
-    [
-        "entornexamen-api", "entornexamen-web",
-        "entornexamen-nginx", "entornexamen-db", "entornexamen-redis"
-    ];
+    private string[] AllowedContainers =>
+        config["Docker:AllowedContainers"]?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        ?? ["entornexamen-api", "entornexamen-web", "entornexamen-nginx", "entornexamen-db", "entornexamen-redis"];
 
     public bool IsAvailable() => File.Exists(SocketPath);
 
