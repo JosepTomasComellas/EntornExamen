@@ -102,6 +102,10 @@
                    OnClick="EntrarModePresentacio">
             @Loc["Examen_Presentation"]
         </MudButton>
+        <MudIconButton Icon="@(_modeCompacte ? Icons.Material.Filled.ViewModule : Icons.Material.Filled.ViewCompact)"
+                       title="@(_modeCompacte ? "Mode normal" : "Mode compacte (30+ alumnes)")"
+                       Size="Size.Small"
+                       OnClick="@(() => _modeCompacte = !_modeCompacte)" />
     }
 </MudStack>
 
@@ -235,80 +239,148 @@
                                     a.Estat == EstatConnexioDto.Desconnectat ? "color:#dc2626" :
                                                                                "color:#6b7280";
 
-                    <MudItem xs="12" sm="6" md="@(_mostraDetall ? 6 : 4)" lg="@(_mostraDetall ? 6 : 3)">
+                    <MudItem xs="@(_modeCompacte ? 6 : 12)"
+                             sm="@(_modeCompacte ? 4 : 6)"
+                             md="@(_mostraDetall ? (_modeCompacte ? 4 : 6) : (_modeCompacte ? 3 : 4))"
+                             lg="@(_mostraDetall ? (_modeCompacte ? 4 : 6) : (_modeCompacte ? 2 : 3))">
                         <MudCard Elevation="@(seleccionat ? 6 : 2)"
                                  Style="@($"border-left:4px solid {color};cursor:pointer;{(seleccionat ? $"outline:2px solid {color};outline-offset:2px" : "")}")"
                                  @onclick="() => SeleccionarAlumne(a)">
-                            <MudCardContent Class="pa-3">
-                                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                                    @if (a.FotoUrl is not null)
-                                    {
-                                        <MudAvatar Style="width:48px;height:48px">
-                                            <MudImage Src="@a.FotoUrl"
-                                                      Style="width:48px;height:48px;object-fit:cover" />
-                                        </MudAvatar>
-                                    }
-                                    else
-                                    {
-                                        <MudAvatar Style="@($"width:48px;height:48px;background:{color}20;color:{color}")">
-                                            @((a.Nom?[..1] ?? "?") + (a.Cognoms?[..1] ?? ""))
-                                        </MudAvatar>
-                                    }
-                                    <MudStack Spacing="0" Style="min-width:0;flex:1">
-                                        <MudText Typo="Typo.body2"
-                                                 Style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                                            @(a.Nom is not null ? $"{a.Cognoms}, {a.Nom}" : a.MacAddress)
-                                        </MudText>
-                                        <MudText Typo="Typo.caption"
-                                                 Style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                                            @(a.Email ?? a.IpAssignada ?? "—")
-                                        </MudText>
-                                    </MudStack>
-                                </MudStack>
-
-                                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="mt-2">
-                                    <div style="@($"width:10px;height:10px;border-radius:50%;background:{color}")"></div>
-                                    <MudText Typo="Typo.caption" Style="@($"{textColor};font-weight:600")">
-                                        @EstatText(a.Estat)
-                                        @if (a.Estat == EstatConnexioDto.Desconnectat && _sortideVoluntaries.Contains(a.MacAddress))
+                            <MudCardContent Class="@(_modeCompacte ? "pa-2" : "pa-3")">
+                                @if (_modeCompacte)
+                                {
+                                    <!-- Mode compacte: foto + núm·cognom + estat+elapsed -->
+                                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                        @if (a.FotoUrl is not null)
                                         {
-                                            <MudIcon Icon="@Icons.Material.Filled.ExitToApp"
-                                                     Size="Size.Small" Color="Color.Warning"
-                                                     title="Ha sortit voluntàriament"
-                                                     Style="vertical-align:middle;margin-left:2px" />
+                                            <MudAvatar Style="width:36px;height:36px;flex-shrink:0">
+                                                <MudImage Src="@a.FotoUrl"
+                                                          Style="width:36px;height:36px;object-fit:cover" />
+                                            </MudAvatar>
                                         }
-                                    </MudText>
-                                    @if (a.IpAssignada is not null)
+                                        else
+                                        {
+                                            <MudAvatar Style="@($"width:36px;height:36px;flex-shrink:0;background:{color}20;color:{color};font-size:.8rem")">
+                                                @((a.Nom?[..1] ?? "?") + (a.Cognoms?[..1] ?? ""))
+                                            </MudAvatar>
+                                        }
+                                        <MudStack Spacing="0" Style="min-width:0;flex:1">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Style="min-width:0">
+                                                @if (a.NumLlista.HasValue)
+                                                {
+                                                    <MudText Typo="Typo.caption" Style="font-weight:700;flex-shrink:0;color:var(--mud-palette-text-secondary)">@a.NumLlista ·</MudText>
+                                                }
+                                                <MudText Typo="Typo.caption" Style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
+                                                    @(a.Cognoms ?? a.MacAddress)
+                                                </MudText>
+                                                @if (a.DnsRecents.Any(d => d.EsExterna))
+                                                {
+                                                    <MudIcon Icon="@Icons.Material.Filled.Warning"
+                                                             Color="Color.Warning" Size="Size.Small"
+                                                             title="DNS externes detectades"
+                                                             Style="font-size:.85rem;flex-shrink:0;animation:pulse-warning 1s infinite" />
+                                                }
+                                                @if (!EsIpDhcp(a.IpAssignada))
+                                                {
+                                                    <MudIcon Icon="@Icons.Material.Filled.WifiOff"
+                                                             Color="Color.Error" Size="Size.Small"
+                                                             title="@($"IP fora del rang DHCP")"
+                                                             Style="font-size:.85rem;flex-shrink:0" />
+                                                }
+                                            </MudStack>
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                                <div style="@($"width:8px;height:8px;border-radius:50%;flex-shrink:0;background:{color}")"></div>
+                                                <MudText Typo="Typo.caption" Style="@($"{textColor};font-size:.7rem")">@EstatText(a.Estat)</MudText>
+                                                @if (a.Estat == EstatConnexioDto.Desconnectat && _sortideVoluntaries.Contains(a.MacAddress))
+                                                {
+                                                    <MudIcon Icon="@Icons.Material.Filled.ExitToApp"
+                                                             Size="Size.Small" Color="Color.Warning"
+                                                             title="Ha sortit voluntàriament"
+                                                             Style="font-size:.75rem;flex-shrink:0" />
+                                                }
+                                                @if (a.UltimCheckinAt.HasValue && a.Estat is EstatConnexioDto.Connectat or EstatConnexioDto.SenseCheckin)
+                                                {
+                                                    <MudText Typo="Typo.caption" Style="@($"{ElapsedStyle(a.UltimCheckinAt.Value)};font-size:.7rem;margin-left:auto")">
+                                                        @FormatElapsed((int)(_ara - a.UltimCheckinAt.Value).TotalSeconds)
+                                                    </MudText>
+                                                }
+                                            </MudStack>
+                                        </MudStack>
+                                    </MudStack>
+                                }
+                                else
+                                {
+                                    <!-- Mode normal -->
+                                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                                        @if (a.FotoUrl is not null)
+                                        {
+                                            <MudAvatar Style="width:48px;height:48px">
+                                                <MudImage Src="@a.FotoUrl"
+                                                          Style="width:48px;height:48px;object-fit:cover" />
+                                            </MudAvatar>
+                                        }
+                                        else
+                                        {
+                                            <MudAvatar Style="@($"width:48px;height:48px;background:{color}20;color:{color}")">
+                                                @((a.Nom?[..1] ?? "?") + (a.Cognoms?[..1] ?? ""))
+                                            </MudAvatar>
+                                        }
+                                        <MudStack Spacing="0" Style="min-width:0;flex:1">
+                                            <MudText Typo="Typo.body2"
+                                                     Style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                                                @(a.Nom is not null ? $"{a.Cognoms}, {a.Nom}" : a.MacAddress)
+                                            </MudText>
+                                            <MudText Typo="Typo.caption"
+                                                     Style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                                                @(a.Email ?? a.IpAssignada ?? "—")
+                                            </MudText>
+                                        </MudStack>
+                                    </MudStack>
+
+                                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="mt-2">
+                                        <div style="@($"width:10px;height:10px;border-radius:50%;background:{color}")"></div>
+                                        <MudText Typo="Typo.caption" Style="@($"{textColor};font-weight:600")">
+                                            @EstatText(a.Estat)
+                                            @if (a.Estat == EstatConnexioDto.Desconnectat && _sortideVoluntaries.Contains(a.MacAddress))
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.ExitToApp"
+                                                         Size="Size.Small" Color="Color.Warning"
+                                                         title="Ha sortit voluntàriament"
+                                                         Style="vertical-align:middle;margin-left:2px" />
+                                            }
+                                        </MudText>
+                                        @if (a.IpAssignada is not null)
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                · @a.IpAssignada
+                                            </MudText>
+                                        }
+                                        @if (a.DnsRecents.Any(d => d.EsExterna))
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.Warning"
+                                                     Color="Color.Warning" Size="Size.Small"
+                                                     title="DNS externes detectades"
+                                                     Style="animation:pulse-warning 1s infinite" />
+                                        }
+                                        @if (!EsIpDhcp(a.IpAssignada))
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.WifiOff"
+                                                     Color="Color.Error" Size="Size.Small"
+                                                     title="@($"IP fora del rang DHCP ({_dhcpPrefix}x)")"
+                                                     Class="ml-auto" />
+                                        }
+                                    </MudStack>
+
+                                    @if (a.UltimCheckinAt.HasValue)
                                     {
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                            · @a.IpAssignada
+                                            Check-in: @a.UltimCheckinAt.Value.ToLocalTime().ToString("HH:mm:ss")
+                                            @if (a.Estat is EstatConnexioDto.Connectat or EstatConnexioDto.SenseCheckin)
+                                            {
+                                                <text> — <span style="@ElapsedStyle(a.UltimCheckinAt.Value)">@FormatElapsed((int)(_ara - a.UltimCheckinAt.Value).TotalSeconds)</span></text>
+                                            }
                                         </MudText>
                                     }
-                                        @if (a.DnsRecents.Any(d => d.EsExterna))
-                                    {
-                                        <MudIcon Icon="@Icons.Material.Filled.Warning"
-                                                 Color="Color.Warning" Size="Size.Small"
-                                                 title="DNS externes detectades"
-                                                 Style="animation:pulse-warning 1s infinite" />
-                                    }
-                                    @if (!EsIpDhcp(a.IpAssignada))
-                                    {
-                                        <MudIcon Icon="@Icons.Material.Filled.WifiOff"
-                                                 Color="Color.Error" Size="Size.Small"
-                                                 title="@($"IP fora del rang DHCP ({_dhcpPrefix}x)")"
-                                                 Class="ml-auto" />
-                                    }
-                                </MudStack>
-
-                                @if (a.UltimCheckinAt.HasValue)
-                                {
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                        Check-in: @a.UltimCheckinAt.Value.ToLocalTime().ToString("HH:mm:ss")
-                                        @if (a.Estat is EstatConnexioDto.Connectat or EstatConnexioDto.SenseCheckin)
-                                        {
-                                            <text> — <span style="@ElapsedStyle(a.UltimCheckinAt.Value)">@FormatElapsed((int)(_ara - a.UltimCheckinAt.Value).TotalSeconds)</span></text>
-                                        }
-                                    </MudText>
                                 }
                             </MudCardContent>
                         </MudCard>
@@ -777,6 +849,7 @@
     private int?   _sessioId;
     private bool   _carregant;
     private bool   _mostraDetall;
+    private bool   _modeCompacte;
 
     private bool    _mostrarDialegNovaSessio;
     private bool    _mostrarDialegMissatge;
@@ -817,10 +890,11 @@
                  && (_filtreEstat is null || a.Estat == _filtreEstat))
         .OrderBy(a => a.Estat switch
         {
-            EstatConnexioDto.Connectat    => 0,
+            EstatConnexioDto.Desconnectat => 0,
             EstatConnexioDto.SenseCheckin => 1,
-            EstatConnexioDto.Desconnectat => 2,
-            _                            => 3
+            EstatConnexioDto.Expulsat     => 2,
+            EstatConnexioDto.NoConnectat  => 3,
+            _                            => 4
         })
         .ThenBy(a => a.NumLlista ?? int.MaxValue)
         .ThenBy(a => a.Cognoms);
