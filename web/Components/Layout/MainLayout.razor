@@ -23,8 +23,8 @@
 
         <MudSpacer />
 
-        <!-- Usuari + logout -->
-        @if (UserState.IsLoggedIn)
+        <!-- Usuari + logout (ocult a la pàgina d'alumne) -->
+        @if (UserState.IsLoggedIn && !IsExamenPage)
         {
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Style="min-width:0">
                 <MudChip T="string" Size="Size.Small"
@@ -127,6 +127,9 @@
     private string _primaryColor   = "#CC0000"; // sobreescrit a OnInitialized
 
     private (string Name, string Hex)[] _colorOptions = []; // inicialitzat a OnInitialized
+
+    private bool IsExamenPage =>
+        Nav.ToBaseRelativePath(Nav.Uri).TrimStart('/').Equals("examen", StringComparison.OrdinalIgnoreCase);
 
     private string LogoHref => UserState.IsStudent   ? "/alumne/dashboard"
                              : UserState.IsProfessor ? "/professor/dashboard"
