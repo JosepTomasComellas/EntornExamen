@@ -1,6 +1,4 @@
 @using static Microsoft.AspNetCore.Components.Web.RenderMode
-@using System.Globalization
-@using Microsoft.AspNetCore.Localization
 <!DOCTYPE html>
 <html lang="ca">
 <head>
@@ -59,13 +57,6 @@
     {
         if (HttpContext is not null)
         {
-            var feature = HttpContext.Features.Get<IRequestCultureFeature>();
-            if (feature is not null)
-            {
-                CultureInfo.DefaultThreadCurrentCulture   = feature.RequestCulture.Culture;
-                CultureInfo.DefaultThreadCurrentUICulture = feature.RequestCulture.UICulture;
-            }
-
             var ip = HttpContext.Request.Headers["X-Real-IP"].FirstOrDefault()
                   ?? HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()
                          ?.Split(',')[0].Trim()

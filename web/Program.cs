@@ -11,6 +11,14 @@ using EntornExamen.Web.Resources;
 // Necessari per a ExcelDataReader: suport d'encodings Windows (cp1252, etc.)
 System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
 
+// Estableix el català com a cultura per defecte per a TOTS els threads del procés.
+// Sense això, els threads del ThreadPool hereten la cultura del SO (sovint es-ES en
+// Windows), causant un flash "castellà → català" en el primer render del circuit Blazor.
+// RequestLocalizationMiddleware sobreescriu correctament la cultura per a les peticions
+// amb cookie .AspNetCore.Culture=es.
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture   = new System.Globalization.CultureInfo("ca");
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = new System.Globalization.CultureInfo("ca");
+
 var builder = WebApplication.CreateBuilder(args);
 
 // L'antiforgery registra com a Error quan troba una cookie vella (clau caducada/canviada),
