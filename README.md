@@ -1,4 +1,4 @@
-# EntornExamen · v3.5.6
+# EntornExamen · v3.5.7
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 Branding, colors, logo i xarxa DHCP configurables des del `.env`.
@@ -328,6 +328,10 @@ dotnet test EntornExamen.Tests/
 ---
 
 ## Changelog
+
+### v3.5.7 (2026-04-30)
+- **Fix flash català → castellà** — `DefaultThreadCurrentCulture` s'estableix ara a l'arrencada del procés (`Program.cs`) en lloc de per petició HTTP, eliminant la race condition amb threads del pool que heretaven la cultura del SO (es-ES en Windows).
+- **Canvi d'idioma sense recarregar pàgina** — el selector d'idioma ara aplica `CultureInfo.CurrentUICulture` directament al circuit Blazor i guarda la cookie, sense fer `location.reload()`. Evita que l'alumne perdi la sessió d'examen en canviar d'idioma.
 
 ### v3.5.6 (2026-04-30)
 - **Navbar alumne** — selector d'idioma i toggle de mode fosc ara visibles per a tothom (alumnes inclosos). Chip de rol, nom, perfil, paleta de colors i botó de logout es mostren únicament per a professors autenticats.
