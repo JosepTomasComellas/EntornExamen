@@ -23,10 +23,9 @@
 
         <MudSpacer />
 
-        <!-- Usuari + logout (ocult a la pàgina d'alumne) -->
-        @if (UserState.IsLoggedIn && !IsExamenPage)
-        {
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Style="min-width:0">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Style="min-width:0">
+            @if (UserState.IsLoggedIn)
+            {
                 <MudChip T="string" Size="Size.Small"
                          Style="color:white;background:rgba(255,255,255,.15);flex-shrink:0">
                     @UserState.Role
@@ -36,35 +35,38 @@
                          Class="d-none d-sm-block">
                     @UserState.NomComplet
                 </MudText>
-                @if (UserState.IsProfessor)
-                {
-                    <MudIconButton Icon="@Icons.Material.Filled.AccountCircle"
-                                   Color="Color.Inherit" title="@Loc["Nav_MyProfile"]"
-                                   Href="/professor/perfil" />
-                }
-                <!-- Selector d'idioma -->
-                <MudMenu Icon="@Icons.Material.Filled.Translate" Color="Color.Inherit"
-                         title="@Loc["Nav_Language"]" Dense="true" AnchorOrigin="Origin.BottomRight">
-                    <MudMenuItem OnClick='async () => await JS.InvokeVoidAsync("setCulture", "ca")'>
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <MudText Typo="Typo.body2">@Loc["Lang_Catalan"]</MudText>
-                            @if (System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ca")
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Success" />
-                            }
-                        </MudStack>
-                    </MudMenuItem>
-                    <MudMenuItem OnClick='async () => await JS.InvokeVoidAsync("setCulture", "es")'>
-                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <MudText Typo="Typo.body2">@Loc["Lang_Spanish"]</MudText>
-                            @if (System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "es")
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Success" />
-                            }
-                        </MudStack>
-                    </MudMenuItem>
-                </MudMenu>
-                <!-- Selector de color primari -->
+            }
+            @if (UserState.IsProfessor)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.AccountCircle"
+                               Color="Color.Inherit" title="@Loc["Nav_MyProfile"]"
+                               Href="/professor/perfil" />
+            }
+            <!-- Selector d'idioma — visible per a tothom -->
+            <MudMenu Icon="@Icons.Material.Filled.Translate" Color="Color.Inherit"
+                     title="@Loc["Nav_Language"]" Dense="true" AnchorOrigin="Origin.BottomRight">
+                <MudMenuItem OnClick='async () => await JS.InvokeVoidAsync("setCulture", "ca")'>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudText Typo="Typo.body2">@Loc["Lang_Catalan"]</MudText>
+                        @if (System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ca")
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Success" />
+                        }
+                    </MudStack>
+                </MudMenuItem>
+                <MudMenuItem OnClick='async () => await JS.InvokeVoidAsync("setCulture", "es")'>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudText Typo="Typo.body2">@Loc["Lang_Spanish"]</MudText>
+                        @if (System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "es")
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Success" />
+                        }
+                    </MudStack>
+                </MudMenuItem>
+            </MudMenu>
+            @if (UserState.IsProfessor)
+            {
+                <!-- Selector de color primari — només professors -->
                 <MudMenu Icon="@Icons.Material.Filled.Palette" Color="Color.Inherit"
                          title="@Loc["Nav_ColorTheme"]" Dense="true" AnchorOrigin="Origin.BottomRight">
                     @foreach (var (name, hex) in _colorOptions)
@@ -82,16 +84,20 @@
                         </MudMenuItem>
                     }
                 </MudMenu>
-                <MudIconButton Icon="@(_darkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
-                               Color="Color.Inherit"
-                               title="@(_darkMode ? Loc["Nav_LightMode"].Value : Loc["Nav_DarkMode"].Value)"
-                               OnClick="ToggleDarkMode" />
+            }
+            <!-- Mode fosc — visible per a tothom -->
+            <MudIconButton Icon="@(_darkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                           Color="Color.Inherit"
+                           title="@(_darkMode ? Loc["Nav_LightMode"].Value : Loc["Nav_DarkMode"].Value)"
+                           OnClick="ToggleDarkMode" />
+            @if (UserState.IsLoggedIn)
+            {
                 <MudIconButton Icon="@Icons.Material.Filled.Logout"
                                Color="Color.Inherit"
                                title="@string.Format(Loc["Nav_LogoutTitle"].Value, UserState.NomComplet)"
                                OnClick="Logout" />
-            </MudStack>
-        }
+            }
+        </MudStack>
     </MudAppBar>
 
     <MudMainContent>
@@ -127,9 +133,6 @@
     private string _primaryColor   = "#CC0000"; // sobreescrit a OnInitialized
 
     private (string Name, string Hex)[] _colorOptions = []; // inicialitzat a OnInitialized
-
-    private bool IsExamenPage =>
-        Nav.ToBaseRelativePath(Nav.Uri).TrimStart('/').Equals("examen", StringComparison.OrdinalIgnoreCase);
 
     private string LogoHref => UserState.IsStudent   ? "/alumne/dashboard"
                              : UserState.IsProfessor ? "/professor/dashboard"
