@@ -42,7 +42,7 @@ validar_env() {
         [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
         key=$(echo "$key" | tr -d '[:space:]')
         value=$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-        eval "ENV_${key}='${value}'"
+        eval "ENV_${key}=$(printf '%q' "$value")"
     done < .env
 
     # Variables obligatòries
