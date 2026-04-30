@@ -1,4 +1,4 @@
-# EntornExamen · v3.5.5
+# EntornExamen · v3.5.6
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 Branding, colors, logo i xarxa DHCP configurables des del `.env`.
@@ -328,6 +328,9 @@ dotnet test EntornExamen.Tests/
 ---
 
 ## Changelog
+
+### v3.5.6 (2026-04-30)
+- **Navbar alumne** — selector d'idioma i toggle de mode fosc ara visibles per a tothom (alumnes inclosos). Chip de rol, nom, perfil, paleta de colors i botó de logout es mostren únicament per a professors autenticats.
 
 ### v3.5.5 (2026-04-30)
 - **Fix `BackupService` ZIP** — `StreamWriter` de `backup.json` no es tancava abans del foreach de fotos (faltava bloc `{ }` propi), causant `IOException: Entries cannot be created while previously created entries are still open`.
