@@ -201,9 +201,11 @@ public class BackupService(AppDbContext db, IConfiguration cfg, ILogger<BackupSe
         using var ms  = new MemoryStream();
         using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
         {
-            var entry = zip.CreateEntry("backup.json", CompressionLevel.Optimal);
-            await using var sw = new StreamWriter(entry.Open());
-            await sw.WriteAsync(json);
+            {
+                var entry = zip.CreateEntry("backup.json", CompressionLevel.Optimal);
+                await using var sw = new StreamWriter(entry.Open());
+                await sw.WriteAsync(json);
+            }
 
             if (Directory.Exists(fotosDir))
             {
