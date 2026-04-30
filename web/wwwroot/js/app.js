@@ -10,12 +10,12 @@ document.addEventListener('dragover', function (e) {
 });
 
 // ── Canvi de cultura (i18n) ───────────────────────────────────────────────────
-// Escriu la cookie .AspNetCore.Culture i recarrega la pàgina per aplicar-la.
-window.setCulture = function (culture) {
+// Escriu la cookie .AspNetCore.Culture sense recarregar la pàgina.
+// Blazor aplica la cultura immediatament via CultureInfo.CurrentUICulture.
+window.setCultureCookie = function (culture) {
     const expiry = new Date();
     expiry.setFullYear(expiry.getFullYear() + 1);
     document.cookie = `.AspNetCore.Culture=c=${culture}|uic=${culture}; expires=${expiry.toUTCString()}; path=/; SameSite=Lax`;
-    location.reload();
 };
 
 window.downloadBase64File = function (base64, fileName, mimeType) {

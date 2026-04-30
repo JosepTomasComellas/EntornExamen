@@ -45,19 +45,19 @@
             <!-- Selector d'idioma — visible per a tothom -->
             <MudMenu Icon="@Icons.Material.Filled.Translate" Color="Color.Inherit"
                      title="@Loc["Nav_Language"]" Dense="true" AnchorOrigin="Origin.BottomRight">
-                <MudMenuItem OnClick='async () => await JS.InvokeVoidAsync("setCulture", "ca")'>
+                <MudMenuItem OnClick='() => CanviarCulturaAsync("ca")'>
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                         <MudText Typo="Typo.body2">@Loc["Lang_Catalan"]</MudText>
-                        @if (System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ca")
+                        @if (_cultura == "ca")
                         {
                             <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Success" />
                         }
                     </MudStack>
                 </MudMenuItem>
-                <MudMenuItem OnClick='async () => await JS.InvokeVoidAsync("setCulture", "es")'>
+                <MudMenuItem OnClick='() => CanviarCulturaAsync("es")'>
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                         <MudText Typo="Typo.body2">@Loc["Lang_Spanish"]</MudText>
-                        @if (System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "es")
+                        @if (_cultura == "es")
                         {
                             <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Success" />
                         }
@@ -131,6 +131,7 @@
     private bool   _sessionChecked = false;
     private bool   _darkMode       = false;
     private string _primaryColor   = "#CC0000"; // sobreescrit a OnInitialized
+    private string _cultura        = "ca";      // sobreescrit a OnAfterRenderAsync
 
     private (string Name, string Hex)[] _colorOptions = []; // inicialitzat a OnInitialized
 
@@ -245,6 +246,8 @@
         }
         catch { /* clau DataProtection caducada o dades invàlides → ignora */ }
 
+        _cultura = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+
         try
         {
             var dm = await LocalStorage.GetAsync<bool>("entornexamen_darkmode");
@@ -298,6 +301,17 @@
             return $"#{r:X2}{g:X2}{b:X2}";
         }
         catch { return hex; }
+    }
+
+    private async Task CanviarCulturaAsync(string cultura)
+    {
+        if (_cultura == cultura) return;
+        _cultura = cultura;
+        var ci = new System.Globalization.CultureInfo(cultura);
+        System.Globalization.CultureInfo.CurrentCulture   = ci;
+        System.Globalization.CultureInfo.CurrentUICulture = ci;
+        await JS.InvokeVoidAsync("setCultureCookie", cultura);
+        StateHasChanged();
     }
 
     private async Task Logout()
