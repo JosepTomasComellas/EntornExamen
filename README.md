@@ -1,4 +1,4 @@
-# EntornExamen · v3.5.4
+# EntornExamen · v3.5.5
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 Branding, colors, logo i xarxa DHCP configurables des del `.env`.
@@ -328,6 +328,11 @@ dotnet test EntornExamen.Tests/
 ---
 
 ## Changelog
+
+### v3.5.5 (2026-04-30)
+- **Fix `BackupService` ZIP** — `StreamWriter` de `backup.json` no es tancava abans del foreach de fotos (faltava bloc `{ }` propi), causant `IOException: Entries cannot be created while previously created entries are still open`.
+- **Fix `server-update.sh`** — peta si el `.env` conté cometes simples (ex: `d'Informàtica` a `BRAND_ORGANITZACIO`). Corregit amb `printf '%q'` per escapar el valor abans de l'`eval`.
+- **Docs** — `.env.example` indica explícitament que `EXAMEN_SENSE_CHECKIN_FACTOR` i `EXAMEN_DESCONNECTAT_FACTOR` accepten decimals.
 
 ### v3.5.4 (2026-04-29)
 - **Detecció ràpida de caiguda de circuit** — en perdre la connexió SignalR, `ExamenCircuitHandler.OnConnectionDownAsync` crida immediatament `POST /api/examen/alerta-circuit/{studentId}`: l'alumne passa a `SenseCheckin` (taronja) en ~5 s. Quan el circuit es reconnecta, `PendingImmediateCheckin` dispara un check-in en ≤1 s i torna a verd.
