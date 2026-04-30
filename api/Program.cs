@@ -81,9 +81,10 @@ builder.Services.AddStackExchangeRedisCache(opt =>
     opt.InstanceName  = "entornexamen:";
 });
 
-// ── Rate limiting (protecció contra força bruta) ───────────────────────────
+// ── Rate limiting ────────────────────────────────────────────────────────────
 builder.Services.AddRateLimiter(opt =>
 {
+    // Auth: protecció contra força bruta (global, per servidor)
     opt.AddFixedWindowLimiter("auth", o =>
     {
         o.PermitLimit         = 10;
@@ -91,6 +92,20 @@ builder.Services.AddRateLimiter(opt =>
         o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
         o.QueueLimit          = 0;
     });
+
+    // Check-in: xarxa aïllada → rate limit suau per IP (5 cada 30 s)
+    // per protegir el servidor davant de clients bugats o mal configurats.
+    opt.AddPolicy("checkin", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit          = 5,
+                Window               = TimeSpan.FromSeconds(30),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit           = 0,
+            }));
+
     opt.RejectionStatusCode = 429;
 });
 
@@ -301,6 +316,16 @@ app.UseAuthorization();
 // ── Helpers locals ────────────────────────────────────────────────────────────
 static int GetUserId(ClaimsPrincipal user) =>
     int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;
+
+// Valida el token intern per a les crides web → api (sortida-circuit, alerta-circuit).
+// Si EXAMEN_INTERNAL_API_TOKEN no està configurat, la validació es salta (retrocompatible).
+static bool EsTokenInternValid(HttpContext ctx, IConfiguration config)
+{
+    var expected = config["Examen:InternalApiToken"];
+    if (string.IsNullOrWhiteSpace(expected)) return true;
+    return ctx.Request.Headers.TryGetValue("X-Internal-Token", out var actual)
+        && string.Equals(actual, expected, StringComparison.Ordinal);
+}
 
 static bool IsAdmin(ClaimsPrincipal user) =>
     user.IsInRole("Admin");
@@ -894,7 +919,7 @@ app.MapPost("/api/examen/checkin", async (CheckinRequest req, IExamenService svc
     return error is not null
         ? Results.UnprocessableEntity(new { error })
         : Results.Ok(resp);
-});
+}).RequireRateLimiting("checkin");
 
 // ── Sortida voluntària alumne ──────────────────────────────────────────────────
 app.MapPost("/api/examen/sortida", async (IExamenService svc, HttpContext ctx) =>
@@ -907,8 +932,11 @@ app.MapPost("/api/examen/sortida", async (IExamenService svc, HttpContext ctx) =
 // ── Sortida per circuit tancat (crida interna del web Blazor Server) ───────────
 // Cridat pel ExamenCircuitHandler quan detecta que el navegador de l'alumne s'ha tancat.
 // No necessita JWT: accessible únicament des de la xarxa Docker interna.
-app.MapPost("/api/examen/sortida-circuit/{studentId:int}", async (int studentId, IExamenService svc) =>
+// Protegit opcionalment amb EXAMEN_INTERNAL_API_TOKEN (capçalera X-Internal-Token).
+app.MapPost("/api/examen/sortida-circuit/{studentId:int}",
+    async (int studentId, IExamenService svc, HttpContext ctx, IConfiguration config) =>
 {
+    if (!EsTokenInternValid(ctx, config)) return Results.Unauthorized();
     var (ok, error) = await svc.SortirPerStudentAsync(studentId);
     return ok ? Results.Ok() : Results.NotFound(new { error });
 });
@@ -917,8 +945,11 @@ app.MapPost("/api/examen/sortida-circuit/{studentId:int}", async (int studentId,
 // Cridat immediatament quan OnConnectionDownAsync detecta la pèrdua del circuit.
 // Marca l'alumne com SenseCheckin (taronja) per alertar el professor sense esperar
 // el grace period complet. No necessita JWT.
-app.MapPost("/api/examen/alerta-circuit/{studentId:int}", async (int studentId, IExamenService svc) =>
+// Protegit opcionalment amb EXAMEN_INTERNAL_API_TOKEN (capçalera X-Internal-Token).
+app.MapPost("/api/examen/alerta-circuit/{studentId:int}",
+    async (int studentId, IExamenService svc, HttpContext ctx, IConfiguration config) =>
 {
+    if (!EsTokenInternValid(ctx, config)) return Results.Unauthorized();
     var (ok, _) = await svc.AlertarCircuitCaigutAsync(studentId);
     return ok ? Results.Ok() : Results.NoContent();
 });

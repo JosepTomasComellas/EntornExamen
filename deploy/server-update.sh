@@ -38,10 +38,12 @@ validar_env() {
 
     # Carrega les variables del .env (sense exportar-les a l'entorn)
     # Ignora línies buides i comentaris
-    while IFS='=' read -r key value; do
-        [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+    while IFS= read -r line; do
+        [[ "$line" =~ ^[[:space:]]*#.*$ || -z "${line// /}" ]] && continue
+        key="${line%%=*}"
+        value="${line#*=}"
         key=$(echo "$key" | tr -d '[:space:]')
-        value=$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        [[ -z "$key" ]] && continue
         eval "ENV_${key}=$(printf '%q' "$value")"
     done < .env
 

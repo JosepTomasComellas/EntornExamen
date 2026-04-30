@@ -1,4 +1,4 @@
-# EntornExamen · v3.5.7
+# EntornExamen · v3.5.9
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 Branding, colors, logo i xarxa DHCP configurables des del `.env`.
@@ -102,6 +102,7 @@ nano .env
 | `EXAMEN_SENSE_CHECKIN_FACTOR` | | Factor ×interval per passar a "Sense check-in" (per defecte: `2`) |
 | `EXAMEN_DESCONNECTAT_FACTOR` | | Factor ×interval per marcar com a desconnectat (per defecte: `4`) |
 | `EXAMEN_MODE_PRO` | | `true` permet IPs duplicades (per a proves locals, per defecte: `false`) |
+| `EXAMEN_INTERNAL_API_TOKEN` | | Token secret per a crides internes web → api (opcional; si és buit, no s'exigeix token) |
 | `EXAMEN_SERVER_IP` | | IP del servidor a la xarxa d'examen (redireccions DNS i gateway per sessió, per defecte: `192.168.100.1`) |
 | `EXAMEN_DHCP_NETWORK_PREFIX` | | Prefix de la xarxa DHCP dels alumnes (ex: `192.168.100.`) |
 | `EXAMEN_CIRCUIT_GRACE_PERIOD_SECONDS` | | Temps (s) sense reconnexió del circuit Blazor abans de marcar desconnectat (per defecte: `90`) |
@@ -328,6 +329,20 @@ dotnet test EntornExamen.Tests/
 ---
 
 ## Changelog
+
+### v3.5.9 (2026-04-30)
+- **Rate limiting per IP al check-in** — el endpoint `POST /api/examen/checkin` aplica ara un rate limit de 5 peticions per 30 s per IP. Protegeix el servidor davant de clients bugats o configurats incorrectament sense afectar l'operació normal (1 check-in per 30 s).
+- **Token intern web → api** — els endpoints interns `sortida-circuit` i `alerta-circuit` accepten una capçalera `X-Internal-Token` per a autenticació lleugera. Configurable via `EXAMEN_INTERNAL_API_TOKEN` al `.env`. Retrocompatible: si no es configura, es permet sense token (xarxa Docker aïllada).
+- **Exportació CSV robusta** — els camps s'escapen ara seguint RFC 4180 (`"` → `""`). S'afegeix `sep=;` com a primera línia per a que Excel europeu detecti automàticament el separador punt-i-coma.
+
+### v3.5.8 (2026-04-30)
+- **Fix `setCulture is not a function`** — `MainLayout.CanviarCulturaAsync` cridava `setCultureCookie` (nom renombrat); restaurat a `setCulture` per compatibilitat amb el caché del service worker.
+- **Fix avatar alumne** — `Nom[..1]` llançava `ArgumentOutOfRangeException` si el nom era cadena buida; ara comprova `Length > 0` i les inicials es mostren en majúscula.
+- **Fix `AlertarCircuitCaigutAsync`** — la condició de cerca incloïa únicament `Connectat`; ara accepta també `SenseCheckin`, evitant que la funció retorni error quan `CheckinTimeoutService` ja ha transicionat l'alumne a taronja.
+- **Fix `docker-compose.yml`** — `Examen__DominiEmail`, `Examen__DnsLocalDomain` i `Examen__CheckinIntervalSeconds` no es passaven al servei `web`; l'auto-complete del portal sempre usava `sarria.salesians.cat` independentment del `.env`.
+- **Fix `server-update.sh`** — parsing del `.env` truncava valors amb múltiples `=` (JWT base64); corregit amb `line%%=*` / `line#*=` en lloc de `IFS='='`.
+- **Fix `ExamenCircuitHandler`** — implementa `IDisposable` per garantir que `CancellationTokenSource` es disposa si el handler és destruït sense passar per `OnCircuitClosedAsync`.
+- **Fix barra de progrés Portal** — `Value` del `MudProgressLinear` podia ser negatiu en el primer tick; afegit `Math.Clamp(..., 0, 100)`.
 
 ### v3.5.7 (2026-04-30)
 - **Fix flash català → castellà** — `DefaultThreadCurrentCulture` s'estableix ara a l'arrencada del procés (`Program.cs`) en lloc de per petició HTTP, eliminant la race condition amb threads del pool que heretaven la cultura del SO (es-ES en Windows).

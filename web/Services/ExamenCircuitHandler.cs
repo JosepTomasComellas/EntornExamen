@@ -11,7 +11,7 @@ public class ExamenCircuitHandler(
     ExamenCircuitState state,
     ApiClient api,
     IConfiguration config,
-    ILogger<ExamenCircuitHandler> logger) : CircuitHandler
+    ILogger<ExamenCircuitHandler> logger) : CircuitHandler, IDisposable
 {
     private CancellationTokenSource? _cts;
 
@@ -50,6 +50,13 @@ public class ExamenCircuitHandler(
         _cts?.Dispose();
         _cts = null;
         return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
     }
 
     private async Task ProgramarDesconnexioAsync(int studentId, string email, CancellationToken ct)

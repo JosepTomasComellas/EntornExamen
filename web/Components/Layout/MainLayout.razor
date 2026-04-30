@@ -310,7 +310,7 @@
         var ci = new System.Globalization.CultureInfo(cultura);
         System.Globalization.CultureInfo.CurrentCulture   = ci;
         System.Globalization.CultureInfo.CurrentUICulture = ci;
-        await JS.InvokeVoidAsync("setCultureCookie", cultura);
+        await JS.InvokeVoidAsync("setCulture", cultura);
         StateHasChanged();
     }
 

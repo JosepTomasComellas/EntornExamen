@@ -11,6 +11,7 @@ public class ApiClient
     private readonly HttpClient          _http;
     private readonly UserStateService    _userState;
     private readonly ExamenCircuitState  _circuitState;
+    private readonly IConfiguration      _config;
 
     private static readonly JsonSerializerOptions _json = new()
     {
@@ -18,11 +19,13 @@ public class ApiClient
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public ApiClient(HttpClient http, UserStateService userState, ExamenCircuitState circuitState)
+    public ApiClient(HttpClient http, UserStateService userState, ExamenCircuitState circuitState,
+        IConfiguration config)
     {
         _http         = http;
         _userState    = userState;
         _circuitState = circuitState;
+        _config       = config;
     }
 
     public void SetToken(string token) =>
@@ -176,10 +179,10 @@ public class ApiClient
         PostWithClientIpAsync("/api/examen/sortida");
 
     public Task<bool> SortirCircuitAsync(int studentId) =>
-        PostNoContentAsync($"/api/examen/sortida-circuit/{studentId}", null);
+        PostInternAsync($"/api/examen/sortida-circuit/{studentId}");
 
     public Task<bool> AlertarCircuitCaigutAsync(int studentId) =>
-        PostNoContentAsync($"/api/examen/alerta-circuit/{studentId}", null);
+        PostInternAsync($"/api/examen/alerta-circuit/{studentId}");
 
     public Task<bool> ExpulsarAlumneAsync(int sessioId, int studentId) =>
         PostNoContentAsync($"/api/examen/sessions/{sessioId}/alumnes/{studentId}/expulsar", null);
@@ -430,6 +433,22 @@ public class ApiClient
     {
         if (!string.IsNullOrEmpty(_circuitState.ClientIp))
             req.Headers.TryAddWithoutValidation("X-Forwarded-For", _circuitState.ClientIp);
+    }
+
+    // Afegeix el token intern web→api (si configurat) a les crides internes no exposades a internet.
+    private void AfegirTokenIntern(HttpRequestMessage req)
+    {
+        var token = _config["Examen:InternalApiToken"];
+        if (!string.IsNullOrWhiteSpace(token))
+            req.Headers.TryAddWithoutValidation("X-Internal-Token", token);
+    }
+
+    private async Task<bool> PostInternAsync(string url)
+    {
+        var msg = new HttpRequestMessage(HttpMethod.Post, url);
+        AfegirTokenIntern(msg);
+        var resp = await _http.SendAsync(msg);
+        return resp.IsSuccessStatusCode;
     }
 
     private async Task<bool> PostWithClientIpAsync(string url)

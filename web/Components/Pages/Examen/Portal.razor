@@ -87,7 +87,7 @@
                     else
                     {
                         <MudAvatar Style="width:56px;height:56px;background:#334155;font-size:1.5rem;color:rgba(255,255,255,.9);flex-shrink:0">
-                            @((_checkinResp.Alumne.Nom?[..1] ?? "") + (_checkinResp.Alumne.Cognoms?[..1] ?? ""))
+                            @(((_checkinResp.Alumne.Nom?.Length > 0 ? _checkinResp.Alumne.Nom[..1] : "") + (_checkinResp.Alumne.Cognoms?.Length > 0 ? _checkinResp.Alumne.Cognoms[..1] : "")).ToUpper())
                         </MudAvatar>
                     }
                     <MudStack Spacing="0">
@@ -129,7 +129,7 @@
                     </MudText>
 
                     <MudProgressLinear
-                        Value="@(CheckinInterval > 0 ? (100 - _segonsRestants * 100 / CheckinInterval) : 0)"
+                        Value="@(CheckinInterval > 0 ? Math.Clamp(100 - _segonsRestants * 100 / CheckinInterval, 0, 100) : 0)"
                         Color="Color.Success" Rounded="true" Size="Size.Small"
                         Class="mb-3" />
 

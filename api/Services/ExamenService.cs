@@ -291,10 +291,12 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         if (sessio is null) return null;
 
         var sb = new StringBuilder();
+        // sep=; força Excel europeu a usar punt-i-coma com a separador sense necessitat de configuració manual.
+        sb.AppendLine("sep=;");
         sb.AppendLine(string.Join(";",
-            "\"NumLlista\"", "\"Nom\"", "\"Cognoms\"", "\"Email\"",
-            "\"MAC\"", "\"IP\"", "\"ConnectatAt\"", "\"UltimCheckin\"",
-            "\"Estat\"", "\"DNS_Externes\""));
+            Q("NumLlista"), Q("Nom"), Q("Cognoms"), Q("Email"),
+            Q("MAC"), Q("IP"), Q("ConnectatAt"), Q("UltimCheckin"),
+            Q("Estat"), Q("DNS_Externes")));
 
         foreach (var r in sessio.Registres
             .OrderBy(r => r.Student?.NumLlista ?? int.MaxValue)
@@ -304,15 +306,15 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
                 .Select(p => p.Domini).Distinct().Take(20);
             sb.AppendLine(string.Join(";",
                 r.Student?.NumLlista.ToString() ?? "",
-                $"\"{r.Student?.Nom ?? ""}\"",
-                $"\"{r.Student?.Cognoms ?? ""}\"",
-                $"\"{r.Student?.Email ?? ""}\"",
-                $"\"{r.MacAddress}\"",
-                $"\"{r.IpAssignada ?? ""}\"",
-                $"\"{r.ConnectatAt:dd/MM/yyyy HH:mm:ss}\"",
-                $"\"{r.UltimCheckinAt?.ToString("dd/MM/yyyy HH:mm:ss") ?? ""}\"",
-                $"\"{r.Estat}\"",
-                $"\"{string.Join(" | ", dns)}\""));
+                Q(r.Student?.Nom),
+                Q(r.Student?.Cognoms),
+                Q(r.Student?.Email),
+                Q(r.MacAddress),
+                Q(r.IpAssignada),
+                Q(r.ConnectatAt.ToString("dd/MM/yyyy HH:mm:ss")),
+                Q(r.UltimCheckinAt?.ToString("dd/MM/yyyy HH:mm:ss")),
+                Q(r.Estat.ToString()),
+                Q(string.Join(" | ", dns))));
         }
 
         var titol = sessio.Titol?.Replace(" ", "_") ?? "sessio";
@@ -320,6 +322,10 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         return (Encoding.UTF8.GetPreamble()
             .Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray(), nom);
     }
+
+    // Tanca un valor en cometes dobles escapant les cometes internes (RFC 4180).
+    private static string Q(string? v) => $"\"{(v ?? "").Replace("\"", "\"\"")}\"";
+
 
     // ─── Check-in alumne ──────────────────────────────────────────────────────
 
@@ -636,7 +642,7 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
             .Include(r => r.Student)
             .Include(r => r.Sessio)
             .FirstOrDefaultAsync(r => r.StudentId == studentId &&
-                r.Estat == EstatConnexio.Connectat &&
+                (r.Estat == EstatConnexio.Connectat || r.Estat == EstatConnexio.SenseCheckin) &&
                 r.Sessio.Activa);
 
         if (registre is null)
