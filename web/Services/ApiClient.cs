@@ -178,6 +178,9 @@ public class ApiClient
     public Task<bool> SortirCircuitAsync(int studentId) =>
         PostNoContentAsync($"/api/examen/sortida-circuit/{studentId}", null);
 
+    public Task<bool> AlertarCircuitCaigutAsync(int studentId) =>
+        PostNoContentAsync($"/api/examen/alerta-circuit/{studentId}", null);
+
     public Task<bool> ExpulsarAlumneAsync(int sessioId, int studentId) =>
         PostNoContentAsync($"/api/examen/sessions/{sessioId}/alumnes/{studentId}/expulsar", null);
 

@@ -4,9 +4,10 @@ using Microsoft.EntityFrameworkCore;
 namespace EntornExamen.Api.Services;
 
 /// <summary>
-/// Elimina sessions tancades fa més de 30 dies una vegada al dia.
+/// Elimina sessions tancades fa més de X dies una vegada al dia.
+/// Configurable via Examen:CleanupRetentionDays (per defecte: 30).
 /// </summary>
-public class SessioCleanupService(IServiceProvider services, ILogger<SessioCleanupService> logger)
+public class SessioCleanupService(IServiceProvider services, IConfiguration config, ILogger<SessioCleanupService> logger)
     : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -28,12 +29,16 @@ public class SessioCleanupService(IServiceProvider services, ILogger<SessioClean
         }
     }
 
+    private int RetentionDays =>
+        int.TryParse(config["Examen:CleanupRetentionDays"], out var d) && d > 0 ? d : 30;
+
     private async Task NetejarSessionsAntiguesAsync()
     {
+        var dies = RetentionDays;
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var limit = DateTime.UtcNow.AddDays(-30);
+        var limit = DateTime.UtcNow.AddDays(-dies);
         var sessions = await db.SessionsExamen
             .Where(s => !s.Activa && s.TancadaAt < limit)
             .Include(s => s.Registres)
@@ -45,6 +50,6 @@ public class SessioCleanupService(IServiceProvider services, ILogger<SessioClean
         db.SessionsExamen.RemoveRange(sessions);
         await db.SaveChangesAsync();
 
-        logger.LogInformation("Eliminades {Count} sessions tancades fa més de 30 dies.", sessions.Count);
+        logger.LogInformation("Eliminades {Count} sessions tancades fa més de {Dies} dies.", sessions.Count, dies);
     }
 }

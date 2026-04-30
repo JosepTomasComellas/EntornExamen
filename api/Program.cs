@@ -913,6 +913,16 @@ app.MapPost("/api/examen/sortida-circuit/{studentId:int}", async (int studentId,
     return ok ? Results.Ok() : Results.NotFound(new { error });
 });
 
+// ── Alerta de circuit caigut (crida interna del web Blazor Server) ─────────────
+// Cridat immediatament quan OnConnectionDownAsync detecta la pèrdua del circuit.
+// Marca l'alumne com SenseCheckin (taronja) per alertar el professor sense esperar
+// el grace period complet. No necessita JWT.
+app.MapPost("/api/examen/alerta-circuit/{studentId:int}", async (int studentId, IExamenService svc) =>
+{
+    var (ok, _) = await svc.AlertarCircuitCaigutAsync(studentId);
+    return ok ? Results.Ok() : Results.NoContent();
+});
+
 // ── Expulsar alumne (professor) ────────────────────────────────────────────────
 app.MapPost("/api/examen/sessions/{sessioId:int}/alumnes/{studentId:int}/expulsar",
     async (int sessioId, int studentId, IExamenService svc, ClaimsPrincipal user) =>

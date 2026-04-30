@@ -59,7 +59,7 @@ public class ExamenRedisSubscriber(
             object data = eventNom switch
             {
                 "AlumneConnectat" or "AlumneDesconnectat" or "AlumneDesconnectatVoluntari"
-                    or "NouCheckin" or "MacDesconeguda" =>
+                    or "NouCheckin" or "MacDesconeguda" or "AlumneSenseCheckin" =>
                     JsonSerializer.Deserialize<ExamenEventAlumne>(dataJson, _json)!,
                 "NovaPeticioExterna" =>
                     JsonSerializer.Deserialize<ExamenEventDns>(dataJson, _json)!,

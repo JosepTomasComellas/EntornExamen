@@ -7,8 +7,10 @@ public static class SeedData
 {
     public static async Task InitializeAsync(AppDbContext db, IConfiguration config)
     {
-        var email    = config["Admin:Email"]    ?? "admin@entornexamen.cat";
-        var password = config["Admin:Password"] ?? "Admin123!";
+        var email    = config["Admin:Email"]
+            ?? throw new InvalidOperationException("ADMIN_EMAIL no configurat al .env. És obligatori.");
+        var password = config["Admin:Password"]
+            ?? throw new InvalidOperationException("ADMIN_PASSWORD no configurat al .env. És obligatori.");
         var nom      = config["Admin:Nom"]      ?? "Administrador";
         var cognoms  = config["Admin:Cognoms"]  ?? "";
 

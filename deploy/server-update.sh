@@ -32,6 +32,90 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
+# ── Validació del .env ────────────────────────────────────────────────────────
+validar_env() {
+    local errors=0
+
+    # Carrega les variables del .env (sense exportar-les a l'entorn)
+    # Ignora línies buides i comentaris
+    while IFS='=' read -r key value; do
+        [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+        key=$(echo "$key" | tr -d '[:space:]')
+        value=$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        eval "ENV_${key}='${value}'"
+    done < .env
+
+    # Variables obligatòries
+    for var in MSSQL_SA_PASSWORD JWT_SECRET ADMIN_EMAIL ADMIN_PASSWORD ADMIN_NOM; do
+        val=$(eval echo "\${ENV_${var}:-}")
+        if [ -z "$val" ]; then
+            echo "  [ERROR .env] $var és obligatòria i no està definida."
+            errors=$((errors + 1))
+        fi
+    done
+
+    # JWT_SECRET: mínim 32 caràcters
+    jwt=$(eval echo "\${ENV_JWT_SECRET:-}")
+    if [ -n "$jwt" ] && [ ${#jwt} -lt 32 ]; then
+        echo "  [ERROR .env] JWT_SECRET ha de tenir almenys 32 caràcters (ara en té ${#jwt})."
+        errors=$((errors + 1))
+    fi
+
+    # JWT_SECRET: avís si és el valor d'exemple
+    if [[ "$jwt" == *"CanviaAquest"* ]]; then
+        echo "  [AVÍS  .env] JWT_SECRET sembla el valor d'exemple. Canvia'l per un secret aleatori."
+    fi
+
+    # MSSQL_SA_PASSWORD: mínim 8 caràcters + majúscula + número (requisit SQL Server)
+    mssql=$(eval echo "\${ENV_MSSQL_SA_PASSWORD:-}")
+    if [ -n "$mssql" ]; then
+        if [ ${#mssql} -lt 8 ]; then
+            echo "  [ERROR .env] MSSQL_SA_PASSWORD ha de tenir almenys 8 caràcters."
+            errors=$((errors + 1))
+        fi
+        if ! echo "$mssql" | grep -qP '[A-Z]'; then
+            echo "  [ERROR .env] MSSQL_SA_PASSWORD ha de contenir almenys una majúscula."
+            errors=$((errors + 1))
+        fi
+        if ! echo "$mssql" | grep -qP '[0-9]'; then
+            echo "  [ERROR .env] MSSQL_SA_PASSWORD ha de contenir almenys un número."
+            errors=$((errors + 1))
+        fi
+        if [[ "$mssql" == *"CanviaAquesta"* ]]; then
+            echo "  [AVÍS  .env] MSSQL_SA_PASSWORD sembla el valor d'exemple. Canvia'l."
+        fi
+    fi
+
+    # ADMIN_EMAIL: format bàsic
+    email=$(eval echo "\${ENV_ADMIN_EMAIL:-}")
+    if [ -n "$email" ] && [[ "$email" != *"@"* ]]; then
+        echo "  [ERROR .env] ADMIN_EMAIL no sembla una adreça de correu vàlida: $email"
+        errors=$((errors + 1))
+    fi
+    if [[ "$email" == *"CorreuElectronic"* || "$email" == *"domini"* ]]; then
+        echo "  [AVÍS  .env] ADMIN_EMAIL sembla el valor d'exemple. Canvia'l."
+    fi
+
+    # ADMIN_PASSWORD: avís si és el valor d'exemple
+    admpwd=$(eval echo "\${ENV_ADMIN_PASSWORD:-}")
+    if [[ "$admpwd" == *"CanviaAquesta"* ]]; then
+        echo "  [AVÍS  .env] ADMIN_PASSWORD sembla el valor d'exemple. Canvia'l."
+    fi
+
+    if [ $errors -gt 0 ]; then
+        echo ""
+        echo "  S'han trobat $errors error(s) al .env. Corregeix-los abans de continuar."
+        echo "  Consulta .env.example per a la documentació de cada variable."
+        exit 1
+    fi
+
+    echo "  .env validat correctament."
+}
+
+echo ""
+echo "[0/4] Validant configuració .env..."
+validar_env
+
 # ── Versions: actual i nova ───────────────────────────────────────────────────
 extract_version() {
     grep 'Current' "$1" 2>/dev/null | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]'
@@ -40,7 +124,7 @@ extract_version() {
 VERSIO_ACTUAL=$(extract_version "shared/AppVersion.cs")
 
 echo ""
-echo "[1/4] Descarregant canvis de GitHub..."
+echo "[1/5] Descarregant canvis de GitHub..."
 git fetch --tags origin
 
 VERSIO_NOVA=$(git show origin/main:shared/AppVersion.cs 2>/dev/null \
@@ -67,19 +151,19 @@ git pull --ff-only
 VERSIO_DESPLEGADA=$(extract_version "shared/AppVersion.cs")
 
 echo ""
-echo "[2/4] Aturant contenidors..."
+echo "[2/5] Aturant contenidors..."
 docker compose down
 
 echo ""
-echo "[3/4] Reconstruint imatges Docker..."
+echo "[3/5] Reconstruint imatges Docker..."
 docker compose build --no-cache
 
 echo ""
-echo "[4/4] Arrencant contenidors..."
+echo "[4/5] Arrencant contenidors..."
 docker compose up -d
 
 echo ""
-echo "  Esperant que els serveis arranquin..."
+echo "[5/5] Esperant que els serveis arranquin..."
 for i in $(seq 1 20); do
     docker compose ps | grep -q "entornexamen-nginx.*Up" && break
     printf "." && sleep 3

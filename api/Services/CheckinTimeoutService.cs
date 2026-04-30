@@ -61,6 +61,7 @@ public class CheckinTimeoutService(
         // Connectats sense check-in en interval×SenseCheckinFactor → SenseCheckin
         var threshold1 = ara.AddSeconds(-interval * senseCheckinFactor);
         var sensCheckin = await db.RegistresConnexio
+            .Include(r => r.Student)
             .Where(r => sessionsActives.Contains(r.SessioId) &&
                         r.Estat == EstatConnexio.Connectat &&
                         (r.UltimCheckinAt ?? r.ConnectatAt) < threshold1)
@@ -84,6 +85,14 @@ public class CheckinTimeoutService(
 
         if (sensCheckin.Count > 0 || desconnectats.Count > 0)
             await db.SaveChangesAsync();
+
+        // Notifica en temps real els canvis a SenseCheckin (taronja al plafó del professor)
+        foreach (var r in sensCheckin)
+        {
+            _ = hub.NotificaAlumneSenseCheckinAsync(r.SessioId, new ExamenEventAlumne(
+                r.StudentId, r.Student?.Nom, r.Student?.Cognoms,
+                r.IpAssignada, r.MacAddress, ara));
+        }
 
         foreach (var r in desconnectats)
         {

@@ -1019,6 +1019,15 @@
                     cfg => { cfg.DuplicatesBehavior = SnackbarDuplicatesBehavior.Allow; cfg.VisibleStateDuration = 6000; });
                 break;
             }
+            case "AlumneSenseCheckin" when data is ExamenEventAlumne evt:
+            {
+                var nom = $"{evt.Nom} {evt.Cognoms}".Trim();
+                if (string.IsNullOrEmpty(nom)) nom = evt.Mac ?? evt.Ip ?? "?";
+                ActualitzarAlumne(evt.Mac, a => a with { Estat = EstatConnexioDto.SenseCheckin });
+                AfegirAlerta($"Sense circuit: {nom} ({evt.Ip})",
+                    Icons.Material.Filled.WifiOff, Color.Warning, nom);
+                break;
+            }
             case "NouCheckin" when data is ExamenEventAlumne evt:
             {
                 var trobat = ActualitzarAlumne(evt.Mac, a => a with

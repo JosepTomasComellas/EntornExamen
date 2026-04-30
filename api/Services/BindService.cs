@@ -21,8 +21,9 @@ public class BindService(AppDbContext db, IConfiguration cfg, ILogger<BindServic
 {
     // Volum Docker muntat a /data/net-control/ al contenidor API
     // Al host: /var/lib/docker/volumes/entornexamen_net-control/_data/
-    private string NetControlPath => cfg["NetControl:Path"] ?? "/data/net-control";
+    private string NetControlPath => cfg["NetControl:Path"]      ?? "/data/net-control";
     private string RedirectIp     => cfg["NetControl:RedirectIp"] ?? "192.168.100.1";
+    private string DnsLocalDomain => cfg["Examen:DnsLocalDomain"] ?? "examen.local";
 
     public async Task<List<DominiBloquejatDto>> GetDominisAsync() =>
         await db.DominisBlocats
@@ -115,8 +116,8 @@ public class BindService(AppDbContext db, IConfiguration cfg, ILogger<BindServic
             var zoneDb = $"""
                 ; EntornExamen — zona bloquejada genèrica
                 $TTL 60
-                @ IN SOA ns.examen.local. admin.examen.local. ({serial} 60 60 60 60)
-                @ IN NS ns.examen.local.
+                @ IN SOA ns.{DnsLocalDomain}. admin.{DnsLocalDomain}. ({serial} 60 60 60 60)
+                @ IN NS ns.{DnsLocalDomain}.
                 @ IN A {RedirectIp}
                 * IN A {RedirectIp}
                 """;

@@ -29,6 +29,7 @@ public interface IExamenService
     Task<(bool Ok, string? Error)> EliminarSessioAsync(int sessioId, int professorId, bool isAdmin);
     Task<(bool Ok, string? Error)> SortirAsync(string clientIp);
     Task<(bool Ok, string? Error)> SortirPerStudentAsync(int studentId);
+    Task<(bool Ok, string? Error)> AlertarCircuitCaigutAsync(int studentId);
     Task<(bool Ok, string? Error)> ExpulsarAsync(int sessioId, int studentId, int professorId, bool isAdmin);
     Task<List<AlumneMacDto>> GetMacsAsync(bool isAdmin);
     Task<bool> DeleteMacAsync(int id, bool isAdmin);
@@ -623,6 +624,30 @@ public class ExamenService(AppDbContext db, ExamenHub hub, IConfiguration config
         _ = hub.NotificaAlumneDesconnectatAsync(registre.SessioId, new ExamenEventAlumne(
             registre.StudentId, registre.Student?.Nom, registre.Student?.Cognoms,
             registre.IpAssignada, registre.MacAddress, ara));
+
+        return (true, null);
+    }
+
+    // ─── Alerta de circuit caigut (crida interna des del web Blazor) ─────────────
+
+    public async Task<(bool Ok, string? Error)> AlertarCircuitCaigutAsync(int studentId)
+    {
+        var registre = await db.RegistresConnexio
+            .Include(r => r.Student)
+            .Include(r => r.Sessio)
+            .FirstOrDefaultAsync(r => r.StudentId == studentId &&
+                r.Estat == EstatConnexio.Connectat &&
+                r.Sessio.Activa);
+
+        if (registre is null)
+            return (false, "No s'ha trobat cap connexió activa per a aquest alumne.");
+
+        registre.Estat = EstatConnexio.SenseCheckin;
+        await db.SaveChangesAsync();
+
+        _ = hub.NotificaAlumneSenseCheckinAsync(registre.SessioId, new ExamenEventAlumne(
+            registre.StudentId, registre.Student?.Nom, registre.Student?.Cognoms,
+            registre.IpAssignada, registre.MacAddress, DateTime.UtcNow));
 
         return (true, null);
     }

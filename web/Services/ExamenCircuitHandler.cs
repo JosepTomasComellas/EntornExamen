@@ -20,7 +20,12 @@ public class ExamenCircuitHandler(
 
     public override Task OnConnectionDownAsync(Circuit circuit, CancellationToken cancellationToken)
     {
+        state.IsCircuitConnected = false;
         if (state.StudentId is null) return Task.CompletedTask;
+
+        // Alerta immediata: posa l'alumne en SenseCheckin (taronja) al plafó del professor
+        // sense esperar el grace period. Permet detectar la caiguda de WiFi en ~5s.
+        _ = api.AlertarCircuitCaigutAsync(state.StudentId.Value);
 
         _cts?.Cancel();
         _cts?.Dispose();
@@ -31,6 +36,8 @@ public class ExamenCircuitHandler(
 
     public override Task OnConnectionUpAsync(Circuit circuit, CancellationToken cancellationToken)
     {
+        state.IsCircuitConnected      = true;
+        state.PendingImmediateCheckin = true;   // dispara check-in en el proper tick del timer
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = null;

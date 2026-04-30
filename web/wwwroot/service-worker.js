@@ -1,4 +1,4 @@
-// EntornExamen Service Worker — v2.0.0
+// EntornExamen Service Worker — v3.5.4
 // Blazor Server requereix connexió al servidor, però podem:
 //   1. Instal·lar l'app com a PWA (standalone)
 //   2. Cachear assets estàtics per càrrega més ràpida

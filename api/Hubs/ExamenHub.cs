@@ -28,6 +28,9 @@ public class ExamenHub(IConnectionMultiplexer redis)
     public Task NotificaAlumneDesconnectatAsync(int sessioId, ExamenEventAlumne evt) =>
         PublicarAsync(CanalSessio(sessioId), "AlumneDesconnectat", evt);
 
+    public Task NotificaAlumneSenseCheckinAsync(int sessioId, ExamenEventAlumne evt) =>
+        PublicarAsync(CanalSessio(sessioId), "AlumneSenseCheckin", evt);
+
     public Task NotificaNouCheckinAsync(int sessioId, ExamenEventAlumne evt) =>
         PublicarAsync(CanalSessio(sessioId), "NouCheckin", evt);
 

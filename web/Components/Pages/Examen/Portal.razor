@@ -427,10 +427,17 @@
         _timer = new System.Threading.Timer(async _ =>
         {
             _segonsRestants--;
-            if (_segonsRestants <= 0)
+            var immediat = CircuitState.PendingImmediateCheckin;
+            if (immediat) CircuitState.PendingImmediateCheckin = false;
+
+            if (_segonsRestants <= 0 || immediat)
             {
                 _segonsRestants = CheckinInterval;
-                if (_checkinResp is not null)
+                // Només fa check-in si el circuit SignalR del navegador és actiu.
+                // Quan el navegador perd la WiFi, el circuit cau però el timer
+                // segueix corrent al servidor; sense aquesta guarda, el check-in
+                // sobreescriuria qualsevol desconnexió detectada per DHCP.
+                if (_checkinResp is not null && CircuitState.IsCircuitConnected)
                 {
                     var (resp, _) = await Api.ExamenCheckinAsync(new CheckinRequest(_email.Trim()));
                     if (resp is not null) _ultimCheckin = DateTime.UtcNow;

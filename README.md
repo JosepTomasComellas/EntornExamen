@@ -1,4 +1,4 @@
-# EntornExamen · v3.5.0
+# EntornExamen · v3.5.4
 
 Sistema de control de presència en temps real durant exàmens sobre xarxa WiFi aïllada.
 Branding, colors, logo i xarxa DHCP configurables des del `.env`.
@@ -102,7 +102,10 @@ nano .env
 | `EXAMEN_SENSE_CHECKIN_FACTOR` | | Factor ×interval per passar a "Sense check-in" (per defecte: `2`) |
 | `EXAMEN_DESCONNECTAT_FACTOR` | | Factor ×interval per marcar com a desconnectat (per defecte: `4`) |
 | `EXAMEN_MODE_PRO` | | `true` permet IPs duplicades (per a proves locals, per defecte: `false`) |
+| `EXAMEN_SERVER_IP` | | IP del servidor a la xarxa d'examen (redireccions DNS i gateway per sessió, per defecte: `192.168.100.1`) |
 | `EXAMEN_DHCP_NETWORK_PREFIX` | | Prefix de la xarxa DHCP dels alumnes (ex: `192.168.100.`) |
+| `EXAMEN_CIRCUIT_GRACE_PERIOD_SECONDS` | | Temps (s) sense reconnexió del circuit Blazor abans de marcar desconnectat (per defecte: `90`) |
+| `EXAMEN_CLEANUP_RETENTION_DAYS` | | Dies de retenció de sessions tancades (per defecte: `30`) |
 | `SMTP_HOST` | | Servidor SMTP (opcional, per a correu de professors) |
 | `BRAND_NOM` | | Nom de l'aplicació (per defecte: `Entorn d'Examens`) |
 | `BRAND_SHORT_NOM` | | Nom curt per al manifest PWA (per defecte: `Examens`) |
@@ -286,7 +289,7 @@ Class ────< SessioExamen ──< RegistreConnexio ──< PeticioTdns
 
 | Canal Redis | Receptor | Events |
 |------------|---------|--------|
-| `examen:sessio:{id}` | Professor | `AlumneConnectat`, `AlumneDesconnectat`, `NouCheckin`, `NovaPeticioExterna`, `MacDesconeguda`, `MissatgeActualitzat`, `SessioTancadaGlobal` |
+| `examen:sessio:{id}` | Professor | `AlumneConnectat`, `AlumneDesconnectat`, `AlumneSenseCheckin`, `NouCheckin`, `NovaPeticioExterna`, `MacDesconeguda`, `MissatgeActualitzat`, `SessioTancadaGlobal` |
 | `examen:alumne:{id}` | Alumne | `MissatgeProfessor`, `SessioTancadaGlobal`, `RecursosActualitzats` |
 
 ---
@@ -307,6 +310,7 @@ Class ────< SessioExamen ──< RegistreConnexio ──< PeticioTdns
 | `POST` | `/api/examen/checkin` | — | Check-in alumne (per IP) |
 | `POST` | `/api/examen/sortida` | — | Sortida voluntària alumne |
 | `POST` | `/api/examen/sortida-circuit/{studentId}` | — | Sortida per circuit tancat (intern web) |
+| `POST` | `/api/examen/alerta-circuit/{studentId}` | — | Alerta immediata circuit caigut → `SenseCheckin` (intern web) |
 | `POST` | `/api/examen/dhcp/event` | — | Event DHCP (hook) |
 | `POST` | `/api/examen/dns/event` | — | Event DNS |
 | `GET/DELETE` | `/api/examen/macs` | JWT admin | Gestió dispositius |
@@ -324,6 +328,26 @@ dotnet test EntornExamen.Tests/
 ---
 
 ## Changelog
+
+### v3.5.4 (2026-04-29)
+- **Detecció ràpida de caiguda de circuit** — en perdre la connexió SignalR, `ExamenCircuitHandler.OnConnectionDownAsync` crida immediatament `POST /api/examen/alerta-circuit/{studentId}`: l'alumne passa a `SenseCheckin` (taronja) en ~5 s. Quan el circuit es reconnecta, `PendingImmediateCheckin` dispara un check-in en ≤1 s i torna a verd.
+- **`IsCircuitConnected` guard** — el timer de Portal.razor (servidor) no envia check-ins mentre el circuit SignalR és caigut, evitant que l'alumne torni a verd just després d'aparèixer taronja.
+- **Període de gràcia DHCP** — `DhcpMonitorService` requereix 3 polls consecutius inactius (15 s) abans de disparar desconnexió, eliminant falses alarmes per renovació de lease DHCP.
+- **`AlumneSenseCheckin` Redis** — nou event al canal `examen:sessio:{id}`, publicat tant per `AlertarCircuitCaigutAsync` com per `CheckinTimeoutService`. El plafó del professor mostra alerta i canvia l'estat a taronja en temps real.
+- **Validació `.env` al desplegament** — `server-update.sh` ara valida el `.env` com a pas 0 (variables obligatòries, longitud JWT, complexitat MSSQL, format email, valors d'exemple).
+- **`SeedData` obligatori** — `ADMIN_EMAIL` i `ADMIN_PASSWORD` llancen `InvalidOperationException` si no estan configurats (era `null` silenciós).
+- **`SessioCleanupService` configurable** — llegeix `EXAMEN_CLEANUP_RETENTION_DAYS` del `.env` (era 30 dies hardcoded).
+- **`BindService` configura `DnsLocalDomain`** — el domini local (`examen.local`) de les zones BIND9 llegit del `.env` via `Examen:DnsLocalDomain`.
+- **Eliminació valors hardcoded** — domini email, DNS local i llista de contenidors Docker llegits del `.env` en tots els serveis.
+
+### v3.5.3 (2026-04-29)
+- **Fix valors hardcoded** — eliminats tots els valors de domini email (`sarria.salesians.cat`), DNS local (`examen.local`) i contenidors Docker del codi. Tots llegits del `.env` via configuració.
+
+### v3.5.2 (2026-04-29)
+- **Mode compacte al plafó del professor** — les targetes dels alumnes es mostren en format compacte (menys espai, més alumnes visibles). Els alumnes desconnectats apareixen al capdavant de la llista per facilitar la detecció visual.
+
+### v3.5.1 (2026-04-29)
+- **`EXAMEN_CIRCUIT_GRACE_PERIOD_SECONDS` configurable** — el temps d'espera del `ExamenCircuitHandler` abans de marcar l'alumne com a desconnectat ara és configurable via `.env` (per defecte: 90 s).
 
 ### v3.5.0 (2026-04-29)
 - **Gateway per sessió** — el professor pot especificar una IP de gateway en crear una sessió. L'API desa `GatewayIp` a `SessionsExamen` i `BindService.AplicarCanavisAsync` genera el fitxer `gateway-rules` (format `IP_ALUMNE GATEWAY_IP`). El daemon `watch-net-control.sh` aplica policy routing (`ip rule` + `ip route table 200`) per a cada alumne actiu, permetent rutes personalitzades per sessió/classe.

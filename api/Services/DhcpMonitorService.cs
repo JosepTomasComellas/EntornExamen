@@ -18,6 +18,10 @@ public class DhcpMonitorService(
     // Estat anterior: mac → (ip, activa)
     private readonly Dictionary<string, (string? Ip, bool Activa)> _estat = new();
 
+    // Comptador de polls consecutius amb estat inactiu per evitar falsos positius durant renovacions DHCP
+    private readonly Dictionary<string, int> _inactivePolls = new(StringComparer.OrdinalIgnoreCase);
+    private const int DisconnectGracePolls = 3; // 3 × 5 s = 15 s de marge
+
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         logger.LogInformation("DhcpMonitorService iniciat. Fitxer: {Path}", _leasesPath);
@@ -49,17 +53,38 @@ public class DhcpMonitorService(
         {
             if (!_estat.TryGetValue(mac, out var anterior))
             {
-                // MAC nova
+                // MAC nova: connexió immediata
                 if (activa)
                     await PublicarEventAsync("connected", mac, ip, ct);
                 _estat[mac] = (ip, activa);
+                _inactivePolls.Remove(mac);
             }
-            else if (anterior.Activa != activa || anterior.Ip != ip)
+            else if (activa && (!anterior.Activa || anterior.Ip != ip))
             {
-                // Canvi d'estat
-                var eventNom = activa ? "connected" : "disconnected";
-                await PublicarEventAsync(eventNom, mac, ip, ct);
+                // Reconnexió o canvi d'IP: immediat, neteja el comptador de gràcia
+                await PublicarEventAsync("connected", mac, ip, ct);
                 _estat[mac] = (ip, activa);
+                _inactivePolls.Remove(mac);
+            }
+            else if (!activa && anterior.Activa)
+            {
+                // Transició activa → inactiva: aplica grace period per evitar falsos
+                // positius durant la renovació de leases DHCP (el fitxer pot mostrar
+                // breument el lease com a expired/free mentre s'escriu la renovació).
+                _inactivePolls[mac] = _inactivePolls.GetValueOrDefault(mac) + 1;
+                if (_inactivePolls[mac] >= DisconnectGracePolls)
+                {
+                    await PublicarEventAsync("disconnected", mac, ip, ct);
+                    _estat[mac] = (ip, activa);
+                    _inactivePolls.Remove(mac);
+                }
+                // Si no hem arribat al llindar, mantenim _estat[mac] sense canvis
+                // perquè la propera iteració torni a detectar la transició
+            }
+            else if (activa)
+            {
+                // Segueix activa: neteja qualsevol comptador de gràcia pendent
+                _inactivePolls.Remove(mac);
             }
         }
 
@@ -68,8 +93,22 @@ public class DhcpMonitorService(
         foreach (var mac in desaparegudes)
         {
             if (_estat[mac].Activa)
-                await PublicarEventAsync("disconnected", mac, null, ct);
-            _estat.Remove(mac);
+            {
+                // Aplica el mateix grace period per a MACs que desapareixen del fitxer
+                _inactivePolls[mac] = _inactivePolls.GetValueOrDefault(mac) + 1;
+                if (_inactivePolls[mac] >= DisconnectGracePolls)
+                {
+                    await PublicarEventAsync("disconnected", mac, null, ct);
+                    _estat.Remove(mac);
+                    _inactivePolls.Remove(mac);
+                }
+                // Si no hem arribat al llindar, deixem la MAC a _estat fins al proper poll
+            }
+            else
+            {
+                _estat.Remove(mac);
+                _inactivePolls.Remove(mac);
+            }
         }
     }
 

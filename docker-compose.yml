@@ -92,6 +92,7 @@ services:
       Examen__CheckinIntervalSeconds: "${EXAMEN_CHECKIN_INTERVAL_SECONDS:-30}"
       Examen__SenseCheckinFactor:     "${EXAMEN_SENSE_CHECKIN_FACTOR:-2}"
       Examen__DesconnectatFactor:     "${EXAMEN_DESCONNECTAT_FACTOR:-4}"
+      Examen__CleanupRetentionDays:   "${EXAMEN_CLEANUP_RETENTION_DAYS:-30}"
       Examen__ModePro:                "${EXAMEN_MODE_PRO:-false}"
       Examen__DhcpLeasesPath:         "/data/dhcpd.leases"
       Examen__DnsLogPath:             "/data/dns-queries.log"
